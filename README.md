@@ -6,7 +6,8 @@ Currently sourcing projects from: https://project-awesome.org/inputsh/awesome-c
 
 ## Converted projects
 
-https://github.com/reutermj/sds
+* https://github.com/reutermj/sds
+* https://github.com/reutermj/parson
 
 ## Future projects
 
