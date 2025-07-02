@@ -8,9 +8,14 @@ Currently sourcing projects from: https://project-awesome.org/inputsh/awesome-c
 
 * https://github.com/reutermj/sds
 * https://github.com/reutermj/parson
+* https://github.com/reutermj/wjelement
 
 ## Future projects
 
 https://github.com/reutermj/jsmn
 * has a clang-format and clang-tidy target
 * might be good to learn how to prompt it to use: https://github.com/aspect-build/rules_lint
+
+https://github.com/reutermj/yajl
+* this one does a bunch of weird things in the cmake
+* might be a good target for handling really bad build definitions

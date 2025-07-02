@@ -14,10 +14,42 @@
 - **Pattern**: Define dependencies using `bazel_dep()` in MODULE.bazel
 - **Example**: 
   ```starlark
-  module(name = "parson", version = "1.5.3")
+  module(name = "wjelement", version = "1.0.1")
   bazel_dep(name = "rules_cc", version = "0.1.2")
+  bazel_dep(name = "platforms", version = "0.0.11")
   ```
 - **Context**: Bzlmod is the modern dependency management system that provides better version resolution, transitive dependency handling, and eliminates the need for manual repository rules.
+
+#### Use Modular BUILD.bazel Organization
+- **Pattern**: Place BUILD.bazel files in subdirectories close to the source code, similar to CMake's add_subdirectory pattern
+- **Example**: 
+  ```
+  src/lib/BUILD.bazel        # Contains //src/lib:xpl target
+  src/wjreader/BUILD.bazel   # Contains //src/wjreader:wjreader target
+  src/wjelement/BUILD.bazel  # Contains //src/wjelement:wjelement target
+  ```
+- **Context**: This follows Bazel best practices and mirrors CMake's modular organization. It makes source paths shorter and dependencies clearer while keeping related code organized together.
+
+#### Create Global Headers Library for include_directories Equivalent
+- **Pattern**: Create a single cc_library target with all public headers and `includes = ["."]` that other targets depend on
+- **Example**:
+  ```starlark
+  # include/BUILD.bazel
+  cc_library(
+      name = "headers",
+      hdrs = ["header1.h", "header2.h", "header3.h"],
+      includes = ["."],
+      visibility = ["//visibility:public"],
+  )
+  
+  # Other targets depend on this
+  cc_library(
+      name = "mylib",
+      srcs = ["mylib.c"],
+      deps = ["//include:headers"],
+  )
+  ```
+- **Context**: This replicates CMake's `include_directories()` behavior where headers are globally available. All targets get access to the public headers through a single dependency.
 
 #### Minimize Target Count
 - **Pattern**: Create the minimal number of targets needed, avoiding redundant targets
@@ -47,7 +79,7 @@
 
 #### Use Standard Target Naming
 - **Pattern**: Use descriptive, consistent target names that match the project structure
-- **Example**: Main library as `"parson"`, test as `"test"`, variant tests as `"test_hash_collisions"`
+- **Example**: Main library as `"wjelement"`, test as `"wjeunit"`, variant tests as `"test_hash_collisions"`
 - **Context**: Makes the build intuitive and follows Bazel conventions
 
 #### Handle Conditional Compilation in Single-File Projects
@@ -96,6 +128,53 @@
 - **Pattern**: Preserve debug and optimization flags from the original build for consistency during development and testing
 - **Example**: Include `-O0 -g` flags in test targets when they were present in the original build
 - **Context**: Maintains the same debugging experience and performance characteristics during development
+
+#### Create Root-Level Convenience Aliases
+- **Pattern**: Provide convenience aliases in the root BUILD.bazel for commonly used targets
+- **Example**:
+  ```starlark
+  alias(name = "wjelement", actual = "//src/wjelement:wjelement")
+  alias(name = "wjecli", actual = "//src/cli:wjecli")
+  ```
+- **Context**: Makes it easy to reference targets from the root while maintaining the modular structure. Users can build `//:wjelement` instead of `//src/wjelement:wjelement`.
+
+#### Handle Platform-Specific Dependencies Properly
+- **Pattern**: Use `select()` statements for platform-specific compiler flags and link options
+- **Example**:
+  ```starlark
+  cc_library(
+      copts = select({
+          "@platforms//os:linux": ["-D_GNU_SOURCE"],
+          "//conditions:default": [],
+      }),
+      linkopts = select({
+          "@platforms//os:linux": ["-lpthread"],
+          "//conditions:default": [],
+      }),
+  )
+  ```
+- **Context**: Ensures consistent cross-platform behavior and matches the original build system's platform handling.
+
+#### Specify Only Direct Dependencies
+- **Pattern**: Only specify direct dependencies in `deps` attributes; let Bazel resolve transitive dependencies automatically
+- **Example**: If target A depends on B, and B depends on C, only specify B in A's deps
+- **Context**: Bazel automatically handles transitive dependencies, reducing maintenance overhead and preventing dependency conflicts.
+
+#### Use Public Visibility for Library Targets
+- **Pattern**: Mark library targets with `visibility = ["//visibility:public"]` to allow them to be used by external consumers
+- **Example**: 
+  ```starlark
+  cc_library(
+      name = "mylib",
+      visibility = ["//visibility:public"],
+  )
+  ```
+- **Context**: Enables the library to be consumed by other Bazel projects and workspace aliases.
+
+#### Preserve CMake Library Versioning Intent
+- **Pattern**: While Bazel doesn't use CMake-style versioning, document the original version intent for future reference
+- **Example**: Add comments in BUILD files noting the original VERSION and SOVERSION from CMake
+- **Context**: Provides context for future packaging and helps maintain compatibility expectations.
 
 ### Harmful Patterns
 
@@ -157,6 +236,36 @@
 - **Alternative**: Use `deps = [":library"]` in test targets unless the library source uses conditional compilation that requires different preprocessor defines for tests
 - **Example**: Instead of `cc_test(srcs = ["test.c", "lib.c"])`, use `cc_test(srcs = ["test.c"], deps = [":lib"])`
 
+#### Incorrect Header Path Management
+- **Anti-pattern**: Using `strip_include_prefix` or complex header path manipulation for simple include directories
+- **Why harmful**: Can cause compilation failures and makes header dependencies unclear
+- **Alternative**: Use a global headers library with `includes = ["."]` that replicates `include_directories()` behavior from CMake
+
+#### Monolithic BUILD Files at Root
+- **Anti-pattern**: Putting all targets in the root BUILD.bazel file with long source paths
+- **Why harmful**: Creates poor organization, long source paths, and doesn't scale well
+- **Alternative**: Use modular BUILD.bazel files in subdirectories with convenience aliases at the root
+
+#### Missing Visibility Declarations
+- **Anti-pattern**: Forgetting to add visibility declarations to library targets
+- **Why harmful**: Prevents external consumption and breaks convenience aliases
+- **Alternative**: Add `visibility = ["//visibility:public"]` to all library targets that should be consumable
+
+#### Including Transitive Dependencies
+- **Anti-pattern**: Manually specifying all transitive dependencies in the `deps` attribute
+- **Why harmful**: Creates maintenance overhead and can lead to dependency conflicts
+- **Alternative**: Only specify direct dependencies and let Bazel resolve transitive ones automatically
+
+#### Replicating CMake Platform Detection Logic
+- **Anti-pattern**: Trying to replicate complex CMake platform detection and variable setting logic in Bazel
+- **Why harmful**: Bazel has different mechanisms for platform handling, and complex logic can be error-prone
+- **Alternative**: Use Bazel's `select()` with standard platform conditions for platform-specific behavior
+
+#### Using Outdated Dependency Versions
+- **Anti-pattern**: Using older versions of rules_cc or platforms when newer stable versions are available
+- **Why harmful**: Missing bug fixes, performance improvements, and compatibility with newer Bazel versions
+- **Alternative**: Use the latest stable versions recommended by Bazel and update when warnings suggest newer versions
+
 ### Translation Dictionary
 
 #### Build Targets
@@ -214,12 +323,22 @@
 
 #### CMake Translations
 - **CMake**: `add_library(name sources)` → **Bazel**: `cc_library(name = "name", srcs = ["sources"])`
-- **CMake**: `target_include_directories()` → **Bazel**: `hdrs` attribute for public headers
+- **CMake**: `target_include_directories()` → **Bazel**: Global headers library with `includes = ["."]`
 - **CMake**: `target_link_libraries()` → **Bazel**: `deps` attribute
 - **CMake**: `install()` commands → **Bazel**: Handled by packaging rules (not covered in simple conversions)
 - **CMake**: `set_target_properties()` → **Bazel**: Appropriate target attributes
 - **CMake**: Version management → **Bazel**: Module version in MODULE.bazel
 - **CMake**: Public headers → **Bazel**: `hdrs` attribute with appropriate `visibility`
+- **CMake**: `include_directories(include)` → **Bazel**: Global headers library in `include/BUILD.bazel`
+- **CMake**: `add_subdirectory()` → **Bazel**: Modular BUILD.bazel files in subdirectories
+- **CMake**: `target_compile_definitions()` → **Bazel**: `copts = ["-DMACRO"]` or `defines = ["MACRO"]`
+- **CMake**: `target_link_options()` → **Bazel**: `linkopts` attribute
+- **CMake**: `add_executable()` for tests → **Bazel**: `cc_test()` targets
+- **CMake**: `add_executable()` for binaries → **Bazel**: `cc_binary()` targets
+- **CMake**: `add_test()` with arguments → **Bazel**: `cc_test()` with `args` attribute or separate targets
+- **CMake**: `ENABLE_TESTING()` → **Bazel**: `bazel test` command automatically discovers tests
+- **CMake**: `SET_TARGET_PROPERTIES(VERSION, SOVERSION)` → **Bazel**: Comment documenting original versioning intent
+- **CMake**: Complex multi-library dependencies → **Bazel**: Clear dependency layering with explicit `deps`
 
 #### Meson Translations
 - **Meson**: `library(name, sources)` → **Bazel**: `cc_library(name = "name", srcs = sources)`
@@ -233,6 +352,13 @@
 - **Pattern**: Projects with Makefile, CMakeLists.txt, and meson.build → **Bazel**: Single BUILD.bazel that preserves the core functionality
 - **Approach**: Analyze all build systems to understand the complete feature set, then create a Bazel build that captures the essential functionality
 - **Example**: For a library with multiple build systems, focus on the library target and essential test configurations rather than replicating every variant
+
+#### Project Structure Organization
+- **CMake**: Hierarchical CMakeLists.txt files → **Bazel**: Modular BUILD.bazel files in subdirectories
+- **CMake**: Root CMakeLists.txt with add_subdirectory → **Bazel**: Root BUILD.bazel with convenience aliases
+- **Pattern**: `src/lib/CMakeLists.txt` → `src/lib/BUILD.bazel` with shorter source paths
+- **Pattern**: Target references like `target_link_libraries(exe lib)` → `deps = ["//src/lib:lib"]`
+- **Pattern**: Global include directories → Single headers library dependency
 
 ## Detailing future improvements
 
