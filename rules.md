@@ -93,10 +93,212 @@ Include in your summary the following:
 
 ### Bazel Best Practices
 
+#### Use bzlmod over legacy WORKSPACE
+- **Example**: Replace `workspace(name = "sds")` in WORKSPACE file with `MODULE.bazel` containing:
+  ```starlark
+  module(
+      name = "sds",
+      version = "1.0.0",
+  )
+  
+  bazel_dep(name = "rules_cc", version = "0.1.2")
+  ```
+- **Explanation**: bzlmod is the modern Bazel dependency management system that provides better version resolution and cleaner configuration compared to legacy WORKSPACE files
+- **Applicable situations**: All new Bazel projects should use bzlmod for dependency management
+
+#### Use latest versions of Bazel rules
+- **Example**: Use `rules_cc` version `0.1.2` instead of older versions in MODULE.bazel
+- **Explanation**: Latest rule versions include bug fixes, performance improvements, and new features that improve build reliability
+- **Applicable situations**: When setting up dependencies in MODULE.bazel
+
+#### Separate library and test targets appropriately
+- **Example**: Create both `cc_library` and `cc_test` targets:
+  ```starlark
+  cc_library(
+      name = "sds",
+      srcs = ["sds.c"],
+      hdrs = ["sds.h", "sdsalloc.h"],
+      visibility = ["//visibility:public"],
+  )
+  
+  cc_test(
+      name = "sds-test",
+      srcs = ["sds.c", "sds.h", "sdsalloc.h", "testhelp.h"],
+      defines = ["SDS_TEST_MAIN"],
+  )
+  ```
+- **Explanation**: Separating library and test targets allows other projects to depend on the library without including test code, while still providing a way to run tests
+- **Applicable situations**: When the original build system produces both a library and tests
+- **Exceptions**: When tests are embedded in source files using conditional compilation, the test target cannot depend on the library target
+
+#### Use `cc_test` for test targets instead of `cc_binary`
+- **Example**: Use `cc_test(name = "sds-test", ...)` not `cc_binary(name = "sds-test", ...)`
+- **Explanation**: `cc_test` integrates with Bazel's test infrastructure, enabling features like test result reporting, parallel execution, and proper test discovery
+- **Applicable situations**: Any executable that runs tests should use `cc_test`
+
+#### Preserve original compiler flags and defines
+- **Example**: Maintain original flags like `-Wall -std=c99 -pedantic -O2` in `copts`
+- **Explanation**: Original compiler flags ensure the Bazel build produces equivalent behavior and catches the same issues as the original build system
+- **Applicable situations**: When the original build system specifies particular compiler behavior
+
+#### Handle embedded tests with conditional compilation properly
+- **Example**: For `#ifdef SDS_TEST_MAIN` in source files, replicate all source files in the test target with `defines = ["SDS_TEST_MAIN"]`
+- **Explanation**: When tests are conditionally compiled within source files, the test target must compile the source files directly with the test defines rather than depending on the library target, which breaks the normal dependency pattern but is necessary for this compilation model
+- **Applicable situations**: When examining source files reveals conditional test compilation blocks
+
+#### Explicitly load cc rules in BUILD files
+- **Example**: Add `load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")` at the top of BUILD files
+- **Explanation**: Modern rules_cc requires explicit loading of cc rules rather than relying on implicit availability, improving build clarity and compatibility
+- **Applicable situations**: When using cc_library, cc_test, or other cc rules in BUILD files
+
 ### Bazel Anti-Patterns
+
+#### Using legacy WORKSPACE when bzlmod is available
+- **Example**: Creating new `workspace(name = "project")` files instead of using MODULE.bazel
+- **Explanation**: Legacy WORKSPACE files are harder to maintain, have worse dependency resolution, and are being phased out in favor of bzlmod
+- **Alternative approaches**: Always use bzlmod (MODULE.bazel) for new projects
+- **Applicable situations**: Encountered when initially setting up workspace configuration
+
+#### Using `cc_binary` for test executables
+- **Example**: Defining `cc_binary(name = "test-name", ...)` for test programs
+- **Explanation**: `cc_binary` targets don't integrate with Bazel's test framework, missing features like test reporting and proper test discovery
+- **Alternative approaches**: Use `cc_test` to integrate properly with Bazel's test framework
+- **Applicable situations**: When converting Makefile targets that produce test executables
+
+#### Attempting library dependency for embedded conditional tests
+- **Example**: Trying to make test target depend on library when tests are conditionally compiled within the same source files
+- **Explanation**: When tests are embedded using conditional compilation, the library target is compiled without test defines, so the test target cannot use it and must compile the source files directly
+- **Alternative approaches**: Replicate source files in test target with appropriate defines
+- **Applicable situations**: When source code analysis reveals `#ifdef TEST_MAIN` or similar patterns
 
 ### Translation Dictionary
 
+#### Make to Bazel Translations
+
+##### Simple C compilation with flags
+- **Make pattern**: `$(CC) -o target source.c -Wall -std=c99 -pedantic -O2`
+- **Bazel equivalent**: 
+  ```starlark
+  cc_binary(
+      name = "target",
+      srcs = ["source.c"],
+      copts = ["-Wall", "-std=c99", "-pedantic", "-O2"],
+  )
+  ```
+- **Explanation**: Makefile compiler flags map directly to the `copts` attribute in Bazel cc_* rules
+- **Applicable situations**: Direct compilation commands in Makefiles
+
+##### Test compilation with defines
+- **Make pattern**: `$(CC) -o sds-test sds.c -DSDS_TEST_MAIN`
+- **Bazel equivalent**:
+  ```starlark
+  cc_test(
+      name = "sds-test",
+      srcs = ["sds.c"],
+      defines = ["SDS_TEST_MAIN"],
+  )
+  ```
+- **Explanation**: Makefile `-D` flags for preprocessor defines map to the `defines` attribute in Bazel
+- **Applicable situations**: When Makefile uses defines to enable test code
+
+##### Header dependencies
+- **Make pattern**: `target: source.c header1.h header2.h`
+- **Bazel equivalent**: Include headers in `srcs` for local headers or `hdrs` for public headers
+- **Explanation**: Explicit header dependencies in Makefiles become implicit through Bazel's automatic dependency discovery, but headers still need to be listed in the appropriate attribute
+- **Applicable situations**: When Makefile explicitly lists header dependencies
+
+##### Clean targets
+- **Make pattern**: `clean: rm -f target`
+- **Bazel equivalent**: `bazel clean` command (no BUILD file equivalent needed)
+- **Explanation**: Makefile clean targets don't need translation as Bazel provides its own clean command that manages all build outputs
+- **Applicable situations**: Makefile clean rules don't need direct translation
+
+##### All headers inclusion in test targets
+- **Make pattern**: Implicit header dependencies in test compilation
+- **Bazel equivalent**: Explicitly list all headers in `srcs` for test targets with embedded tests
+- **Explanation**: When tests are conditionally compiled and reference all project headers, include all headers in the test target's srcs to ensure proper compilation
+- **Applicable situations**: When test targets need access to private implementation headers
+
 ### Process Guidelines
 
+#### Initial workspace setup sequence
+1. **Command**: Create MODULE.bazel with dependencies
+   - **Explanation**: bzlmod requires MODULE.bazel file to define the module and its dependencies
+   - **Applicable situations**: Setting up bzlmod-based workspace
+   - **Expected output**: Successful module resolution on first build
+
+#### Build verification workflow
+1. **Command**: `bazel query //...`
+   - **Explanation**: Verifies that Bazel can discover all targets in BUILD files before attempting compilation
+   - **Applicable situations**: After creating initial BUILD files to verify basic configuration
+   - **Expected output**: List of all targets found, or error messages for BUILD file syntax issues
+   - **Timing**: Before running any build commands
+
+2. **Command**: `bazel build //...`
+   - **Explanation**: Builds all targets in the workspace to verify BUILD file correctness
+   - **Applicable situations**: Verifying all targets build successfully
+   - **Expected output**: "Build completed successfully" message with target count
+   - **Timing**: After target discovery verification succeeds
+
+3. **Command**: `bazel test //...`
+   - **Explanation**: Runs all test targets to verify they execute correctly
+   - **Applicable situations**: Running all test targets
+   - **Expected output**: Test pass/fail summary
+   - **Timing**: After build verification succeeds
+
+4. **Command**: `bazel test :target-name --test_output=all`
+   - **Explanation**: Shows detailed test output to verify behavior matches original build
+   - **Applicable situations**: Viewing detailed test output for verification
+   - **Expected output**: Complete test execution logs
+   - **Timing**: When verifying test behavior matches original
+
+#### Troubleshooting zero targets found
+- **Command**: `bazel query //...`
+- **Explanation**: When build commands report "Found 0 targets", use query to verify target discovery
+- **Applicable situations**: When `bazel build //...` reports finding zero targets unexpectedly
+- **Expected output**: List of targets or BUILD file syntax errors
+- **Troubleshooting steps**: Check BUILD file syntax, verify file locations match target definitions
+
+#### Troubleshooting missing files
+- **Command**: `bazel build :target --verbose_failures`
+- **Explanation**: Provides detailed error messages when builds fail due to missing dependencies
+- **Applicable situations**: When build fails with missing input files
+- **Expected output**: Detailed error messages showing missing file paths
+- **Troubleshooting steps**: Check srcs list in BUILD file against actual filesystem
+
+#### Verification of behavior equivalence
+- **Command sequence**: `make clean && make target && ./target` followed by `bazel test :target --test_output=all`
+- **Explanation**: Compare original build system output with Bazel test output to verify identical behavior
+- **Applicable situations**: Verifying that Bazel build produces equivalent results to original build system
+- **Expected output**: Identical test output between original and Bazel builds
+- **Timing**: Final verification step after successful Bazel build and test
+
 ### Original Build Analysis Guidelines
+
+#### Makefile examination techniques
+- **Method**: Read complete Makefile content to understand the build logic
+- **Explanation**: Simple Makefiles contain all build logic in a single file that can be read entirely to understand the build process
+- **Applicable situations**: Understanding simple build systems with single Makefile
+- **Expected findings**: Target definitions, compiler flags, source dependencies
+- **Key indicators**: Look for `$(CC)` patterns, `-D` define flags, explicit dependencies
+
+#### Source code analysis for embedded tests
+- **Method**: Search for conditional compilation blocks using `grep -n "#ifdef.*TEST" *.c *.h`
+- **Explanation**: When Makefiles show test targets but no separate test files exist, tests are likely embedded in source files using conditional compilation
+- **Applicable situations**: When Makefile shows test targets but no separate test files
+- **Expected findings**: Conditional compilation blocks that enable test code
+- **Key indicators**: `#ifdef SDS_TEST_MAIN`, `#ifdef TEST`, or similar patterns in source files
+
+#### README analysis for project structure understanding
+- **Method**: Read README.md sections on building and usage
+- **Explanation**: README files often contain critical information about intended usage patterns that affect how targets should be structured
+- **Applicable situations**: Understanding intended usage patterns and library embedding
+- **Expected findings**: Build instructions, dependency information, usage examples
+- **Key indicators**: Embedding instructions, library usage patterns, build requirements
+
+#### Build output comparison methodology
+- **Method**: Execute original build and capture output, then compare with Bazel output
+- **Explanation**: Direct comparison of build outputs ensures that the Bazel translation preserves original behavior exactly
+- **Applicable situations**: Verifying successful translation of build semantics
+- **Expected findings**: Identical test results, equivalent compilation behavior
+- **Key indicators**: Same test pass/fail counts, identical test output messages, equivalent executable behavior
