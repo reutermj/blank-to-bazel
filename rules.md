@@ -7,7 +7,7 @@
 3. **Do not modify source files** - the goal is to get the original sources building with Bazel without changing the underlying codebase.
 5. As part of the summary, write out a rules.new.md that includes a revision of this file with the considerations outlined in: Detailing future improvements.
 4. **Do not modify the "Instructions" and "Detailing future improvements" sections** of the rules.md file when creating rules.new.md.
-5. Base all improvements on actual conversion experience, not speculation
+5. Base all suggested improvements to rules.new.md on actual conversion experience, not speculation
 
 ## Detailing future improvements
 
@@ -102,10 +102,12 @@ Include in your summary the following:
 
 #### Use latest versions of Bazel rules
 - **Example**: Use `rules_cc` version `0.1.2` instead of older versions in MODULE.bazel
-- **Explanation**: Latest rule versions include bug fixes, performance improvements, and new features that improve build reliability
+- **Explanation**: Latest rule versions include bug fixes, performance improvements, and new features that improve build reliability. latest versions of important deps are:
+  * `rules_cc`: `0.1.2`
+  * `platforms`: `1.0.0`
 - **Applicable situations**: When setting up dependencies in MODULE.bazel
 
-#### Separate library and test targets appropriately
+#### Produce well-scoped targets
 - **Example**: Create both `cc_library` and `cc_test` targets:
   ```starlark
   cc_library(
@@ -117,13 +119,25 @@ Include in your summary the following:
   
   cc_test(
       name = "sds-test",
-      srcs = ["sds.c", "sds.h", "sdsalloc.h", "testhelp.h"],
-      defines = ["SDS_TEST_MAIN"],
+      srcs = ["sds-test.c"],
+      deps = [":sds"],
   )
   ```
-- **Explanation**: Separating library and test targets allows other projects to depend on the library without including test code, while still providing a way to run tests
-- **Applicable situations**: When the original build system produces both a library and tests
-- **Exceptions**: When tests are embedded in source files using conditional compilation, the test target cannot depend on the library target
+- **Explanation**: Well-scoped targets improve modularity, reusability, and build performance by allowing Bazel to build only what's necessary
+- **Applicable situations**: When translating build systems with multiple outputs or components
+
+#### Use dependencies between targets
+- **Example**: Make test targets depend on library targets:
+  ```starlark
+  cc_test(
+      name = "sds-test",
+      srcs = ["sds-test.c"],
+      deps = [":sds"],
+  )
+  ```
+- **Explanation**: Using `deps` allows Bazel to manage dependencies correctly, ensuring proper build order and enabling incremental builds
+- **Applicable situations**: When a target relies on code from another target
+- **Exceptions**: Cannot be used when tests are embedded in source files using conditional compilation
 
 #### Use `cc_test` for test targets instead of `cc_binary`
 - **Example**: Use `cc_test(name = "sds-test", ...)` not `cc_binary(name = "sds-test", ...)`
@@ -141,17 +155,17 @@ Include in your summary the following:
 - **Applicable situations**: When examining source files reveals conditional test compilation blocks
 
 #### Explicitly load cc rules in BUILD files
-- **Example**: Add `load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")` at the top of BUILD files
+- **Example**: Add `load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary", "cc_test")` at the top of BUILD files.
 - **Explanation**: Modern rules_cc requires explicit loading of cc rules rather than relying on implicit availability, improving build clarity and compatibility
 - **Applicable situations**: When using cc_library, cc_test, or other cc rules in BUILD files
 
 ### Bazel Anti-Patterns
 
 #### Using legacy WORKSPACE when bzlmod is available
-- **Example**: Creating new `workspace(name = "project")` files instead of using MODULE.bazel
-- **Explanation**: Legacy WORKSPACE files are harder to maintain, have worse dependency resolution, and are being phased out in favor of bzlmod
+- **Example**: Creating new `workspace(name = "project")` files instead of using `MODULE.bazel`
+- **Explanation**: Legacy WORKSPACE files are harder to maintain, have worse dependency resolution, and have been phased out in favor of bzlmod
 - **Alternative approaches**: Always use bzlmod (MODULE.bazel) for new projects
-- **Applicable situations**: Encountered when initially setting up workspace configuration
+- **Applicable situations**: Always
 
 #### Using `cc_binary` for test executables
 - **Example**: Defining `cc_binary(name = "test-name", ...)` for test programs
@@ -207,11 +221,11 @@ Include in your summary the following:
 - **Explanation**: Makefile clean targets don't need translation as Bazel provides its own clean command that manages all build outputs
 - **Applicable situations**: Makefile clean rules don't need direct translation
 
-##### All headers inclusion in test targets
+##### Header inclusion in test targets
 - **Make pattern**: Implicit header dependencies in test compilation
-- **Bazel equivalent**: Explicitly list all headers in `srcs` for test targets with embedded tests
-- **Explanation**: When tests are conditionally compiled and reference all project headers, include all headers in the test target's srcs to ensure proper compilation
-- **Applicable situations**: When test targets need access to private implementation headers
+- **Bazel equivalent**: Explicitly list headers in `srcs` for test targets
+- **Explanation**: When tests reference project headers, include all referenced headers in the test target's srcs to ensure proper compilation
+- **Applicable situations**: When test targets need access to implementation headers
 
 ### Process Guidelines
 
