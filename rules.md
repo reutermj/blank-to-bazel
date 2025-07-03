@@ -5,15 +5,9 @@
 1. Assess the existing build system first to understand its structure, dependencies, and build semantics.
 2. Convert the build script in this repo to a Bazel build configuration that preserves the original build semantics.
 3. **Do not modify source files** - the goal is to get the original sources building with Bazel without changing the underlying codebase.
-4. **Do not modify the "Instructions" and "Detailing future improvements" sections** of the rules.md file when creating rules.new.md.
 5. As part of the summary, write out a rules.new.md that includes a revision of this file with the considerations outlined in: Detailing future improvements.
-
-## Key Principles
-
-- Preserve original build behavior and output
-- Focus on creating Bazel BUILD files and configuration without altering source code
-- Base all improvements on actual conversion experience, not speculation
-- Maintain the integrity of the instruction framework while enhancing the guidance sections
+4. **Do not modify the "Instructions" and "Detailing future improvements" sections** of the rules.md file when creating rules.new.md.
+5. Base all improvements on actual conversion experience, not speculation
 
 ## Detailing future improvements
 
