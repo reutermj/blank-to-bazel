@@ -19,3 +19,7 @@ https://github.com/reutermj/jsmn
 https://github.com/reutermj/yajl
 * this one does a bunch of weird things in the cmake
 * might be a good target for handling really bad build definitions
+
+https://github.com/reutermj/simdjson
+* the implementation of this `#include`s a bunch of .cpp files
+* 
