@@ -10,6 +10,13 @@
 - Base all suggested improvements to rules.new.md on actual conversion experience, not speculation
 - Preserve existing rules even if they're not used in the current translation
 - **Avoid redundancy** - focus on adding rules to the section where they're most relevant and avoid duplicating content across multiple sections
+5. **Produce a detailed conversion log** - Create a comprehensive log file called bazel-conversion.md documenting the conversion process specific to this project. This log should capture project-specific challenges, solutions, and decisions made during the conversion to aid future conversions of updated versions of the same project. Include details such as:
+   - Project-specific build patterns encountered
+   - Dependency resolution challenges and solutions
+   - Source modifications made and why they were necessary
+   - Build target organization decisions
+   - Test configuration adaptations
+   - Any project-specific workarounds or customizations
 
 ## Detailing future improvements
 
