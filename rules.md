@@ -5,9 +5,11 @@
 1. Assess the existing build system first to understand its structure, dependencies, and build semantics.
 2. Convert the build script in this repo to a Bazel build configuration that preserves the original build semantics.
 3. **Do not modify source files** - the goal is to get the original sources building with Bazel without changing the underlying codebase.
-5. As part of the summary, write out a rules.new.md that includes a revision of this file with the considerations outlined in: Detailing future improvements.
-4. **Do not modify the "Instructions" and "Detailing future improvements" sections** of the rules.md file when creating rules.new.md.
-5. Base all suggested improvements to rules.new.md on actual conversion experience, not speculation
+4. As part of the summary, write out a rules.new.md that includes a revision of this file with the considerations outlined in: Detailing future improvements.
+- **Do not modify the "Instructions" and "Detailing future improvements" sections** of the rules.md file when creating rules.new.md.
+- Base all suggested improvements to rules.new.md on actual conversion experience, not speculation
+- Preserve existing rules even if they're not used in the current translation
+- **Avoid redundancy** - focus on adding rules to the section where they're most relevant and avoid duplicating content across multiple sections
 
 ## Detailing future improvements
 
@@ -111,16 +113,16 @@ Include in your summary the following:
 - **Example**: Create both `cc_library` and `cc_test` targets:
   ```starlark
   cc_library(
-      name = "sds",
-      srcs = ["sds.c"],
-      hdrs = ["sds.h", "sdsalloc.h"],
+      name = "library",
+      srcs = ["lib.c"],
+      hdrs = ["lib.h"],
       visibility = ["//visibility:public"],
   )
   
   cc_test(
-      name = "sds-test",
-      srcs = ["sds-test.c"],
-      deps = [":sds"],
+      name = "test",
+      srcs = ["tests.c"],
+      defines = ["TESTS_MAIN"],
   )
   ```
 - **Explanation**: Well-scoped targets improve modularity, reusability, and build performance by allowing Bazel to build only what's necessary
@@ -140,17 +142,17 @@ Include in your summary the following:
 - **Exceptions**: Cannot be used when tests are embedded in source files using conditional compilation
 
 #### Use `cc_test` for test targets instead of `cc_binary`
-- **Example**: Use `cc_test(name = "sds-test", ...)` not `cc_binary(name = "sds-test", ...)`
+- **Example**: Use `cc_test(name = "test", ...)` not `cc_binary(name = "test", ...)`
 - **Explanation**: `cc_test` integrates with Bazel's test infrastructure, enabling features like test result reporting, parallel execution, and proper test discovery
 - **Applicable situations**: Any executable that runs tests should use `cc_test`
 
 #### Preserve original compiler flags and defines
-- **Example**: Maintain original flags like `-Wall -std=c99 -pedantic -O2` in `copts`
+- **Example**: Maintain original flags like `-O0 -g -Wall -Wextra -std=c89 -pedantic-errors` in `copts`
 - **Explanation**: Original compiler flags ensure the Bazel build produces equivalent behavior and catches the same issues as the original build system
 - **Applicable situations**: When the original build system specifies particular compiler behavior
 
 #### Handle embedded tests with conditional compilation properly
-- **Example**: For `#ifdef SDS_TEST_MAIN` in source files, replicate all source files in the test target with `defines = ["SDS_TEST_MAIN"]`
+- **Example**: For `#ifdef TESTS_MAIN` in source files, replicate all source files in the test target with `defines = ["TESTS_MAIN"]`
 - **Explanation**: When tests are conditionally compiled within source files, the test target must compile the source files directly with the test defines rather than depending on the library target, which breaks the normal dependency pattern but is necessary for this compilation model
 - **Applicable situations**: When examining source files reveals conditional test compilation blocks
 
@@ -179,6 +181,12 @@ Include in your summary the following:
 - **Alternative approaches**: Replicate source files in test target with appropriate defines
 - **Applicable situations**: When source code analysis reveals `#ifdef TEST_MAIN` or similar patterns
 
+#### Translating cross-language compilation patterns
+- **Example**: Creating `cc_test` targets that use C++ compiler on C source files like Makefile `testcpp` targets
+- **Explanation**: Cross-language compilation is often a testing artifact rather than a genuine build requirement and adds unnecessary complexity to Bazel builds
+- **Alternative approaches**: Focus on building proper language-specific targets and use Bazel's native multi-language support for genuine interoperability needs
+- **Applicable situations**: When Makefile contains targets using different compilers on the same source files
+
 ### Translation Dictionary
 
 #### Make to Bazel Translations
@@ -197,17 +205,43 @@ Include in your summary the following:
 - **Applicable situations**: Direct compilation commands in Makefiles
 
 ##### Test compilation with defines
-- **Make pattern**: `$(CC) -o sds-test sds.c -DSDS_TEST_MAIN`
+- **Make pattern**: `$(CC) -o test tests.c -DTESTS_MAIN`
 - **Bazel equivalent**:
   ```starlark
   cc_test(
-      name = "sds-test",
-      srcs = ["sds.c"],
-      defines = ["SDS_TEST_MAIN"],
+      name = "test",
+      srcs = ["tests.c"],
+      defines = ["TESTS_MAIN"],
   )
   ```
 - **Explanation**: Makefile `-D` flags for preprocessor defines map to the `defines` attribute in Bazel
 - **Applicable situations**: When Makefile uses defines to enable test code
+
+##### Multiple source file compilation
+- **Make pattern**: `$(CC) -o target file1.c file2.c -DFLAG`
+- **Bazel equivalent**:
+  ```starlark
+  cc_test(
+      name = "target",
+      srcs = ["file1.c", "file2.c"],
+      defines = ["FLAG"],
+  )
+  ```
+- **Explanation**: Multiple source files in Makefile commands map to multiple entries in the `srcs` list
+- **Applicable situations**: When Makefile compiles multiple source files together
+
+##### Conditional compilation with additional defines
+- **Make pattern**: `$(CC) -o test_special tests.c parson.c -DTESTS_MAIN -DSPECIAL_FLAG`
+- **Bazel equivalent**:
+  ```starlark
+  cc_test(
+      name = "test_special", 
+      srcs = ["tests.c", "parson.c"],
+      defines = ["TESTS_MAIN", "SPECIAL_FLAG"],
+  )
+  ```
+- **Explanation**: Multiple defines in Makefile map to multiple entries in the `defines` list
+- **Applicable situations**: When Makefile uses multiple preprocessor defines for different test variants
 
 ##### Header dependencies
 - **Make pattern**: `target: source.c header1.h header2.h`
@@ -248,17 +282,11 @@ Include in your summary the following:
    - **Expected output**: "Build completed successfully" message with target count
    - **Timing**: After target discovery verification succeeds
 
-3. **Command**: `bazel test //...`
+3. **Command**: `bazel test --test_output=all //...`
    - **Explanation**: Runs all test targets to verify they execute correctly
    - **Applicable situations**: Running all test targets
-   - **Expected output**: Test pass/fail summary
+   - **Expected output**: Test pass/fail summary with both bazel and the original test script reporting all passing tests
    - **Timing**: After build verification succeeds
-
-4. **Command**: `bazel test :target-name --test_output=all`
-   - **Explanation**: Shows detailed test output to verify behavior matches original build
-   - **Applicable situations**: Viewing detailed test output for verification
-   - **Expected output**: Complete test execution logs
-   - **Timing**: When verifying test behavior matches original
 
 #### Troubleshooting zero targets found
 - **Command**: `bazel query //...`
@@ -295,7 +323,7 @@ Include in your summary the following:
 - **Explanation**: When Makefiles show test targets but no separate test files exist, tests are likely embedded in source files using conditional compilation
 - **Applicable situations**: When Makefile shows test targets but no separate test files
 - **Expected findings**: Conditional compilation blocks that enable test code
-- **Key indicators**: `#ifdef SDS_TEST_MAIN`, `#ifdef TEST`, or similar patterns in source files
+- **Key indicators**: `#ifdef TESTS_MAIN`, `#ifdef TEST`, or similar patterns in source files
 
 #### README analysis for project structure understanding
 - **Method**: Read README.md sections on building and usage
