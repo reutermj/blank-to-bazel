@@ -17,6 +17,11 @@
    - Build target organization decisions
    - Test configuration adaptations
    - Any project-specific workarounds or customizations
+6. **Update module index** - Add an entry to `module-index.md` documenting the converted module for future reference. The entry should include:
+   - The `bazel_dep` declaration needed to depend on this converted module
+   - A list of the main public targets that other conversions would typically want to depend on
+   - Brief descriptions of what each public target provides
+   - Any notable configuration or usage considerations specific to this module
 
 ## Detailing future improvements
 
