@@ -246,7 +246,6 @@ Include in your summary the following:
   ```
 - **Applicable situations**: When tests read configuration files, test data, or other external files during execution
 
-
 #### Modify source files for Bazel sandbox compatibility only when necessary
 - **Example**: Modify file paths in test code to use `$TEST_TMPDIR` for writable files:
   ```c
@@ -268,6 +267,59 @@ Include in your summary the following:
   ```
 - **Explanation**: Bazel's test sandbox prevents writing to data directories, so tests that create temporary files must use `$TEST_TMPDIR` to maintain functionality while following Bazel security practices
 - **Applicable situations**: When tests fail due to file I/O permission errors in Bazel sandbox and functionality preservation requires minimal source modification
+
+#### Separate public and private headers correctly
+- **Explanation**: Bazel distinguishes between headers that are part of a library's public API (exposed to dependents) and headers that are only needed for internal compilation. This distinction enables better dependency management and prevents accidental exposure of internal implementation details.
+- **Example**: Use `srcs` for private headers and `hdrs` for public headers:
+  ```starlark
+  cc_library(
+      name = "library",
+      srcs = [
+          "lib.c",
+          "internal.h",  # Private header, not exposed to dependents
+      ],
+      hdrs = [
+          "public_api.h",  # Public header, exposed to dependents
+      ],
+  )
+  ```
+- **Applicable situations**: When converting build systems that install only specific headers as part of the public API
+- **What to avoid**: Placing all headers in `hdrs` when some should be private. This exposes internal implementation details unnecessarily. For example, avoid:
+  ```starlark
+  cc_library(
+      name = "library", 
+      hdrs = [
+          "public_api.h",   # Should be in hdrs
+          "internal.h",     # Should be in srcs
+      ],
+  )
+  ```
+
+#### Handle source inclusion anti-patterns with private libraries
+- **Explanation**: When tests include source files directly (e.g., `#include "../src/lib.c"`) to access internal functions, create a private library that exposes the source file as a header. This maintains proper dependency separation while allowing access to internals.
+- **Example**: Create private library for internal access:
+  ```starlark
+  cc_library(
+      name = "lib_private",
+      hdrs = [
+          "src/lib.c",           # Source file exposed as header
+          "include/private.h",   # Private headers
+      ],
+      includes = ["src", "include"],
+      visibility = ["//tests:__pkg__"],
+  )
+  
+  cc_test(
+      name = "internal_test",
+      srcs = ["internal_test.c"],
+      deps = [
+          ":lib",         # Public library
+          ":lib_private", # Private access
+      ],
+  )
+  ```
+- **Applicable situations**: When tests need access to internal functions not exposed in public API and originally include source files directly
+- **What to avoid**: Duplicating source files in test targets or exposing internal functions in public API unnecessarily
 
 ### Translation Dictionary
 
@@ -349,6 +401,45 @@ Include in your summary the following:
 - **Explanation**: Bazel's sandbox isolates tests from the filesystem, so data files must be explicitly declared as dependencies
 - **Applicable situations**: When tests read external files during execution
 
+#### CMake to Bazel Translations
+
+##### CMake library definition
+- **CMake pattern**: `add_library(name source.c)`
+- **Bazel equivalent**:
+  ```starlark
+  cc_library(
+      name = "name",
+      srcs = ["source.c"],
+  )
+  ```
+- **Explanation**: CMake library targets map directly to Bazel cc_library rules
+- **Applicable situations**: When CMake defines library targets
+
+##### CMake public header installation
+- **CMake pattern**: `install(FILES header.h DESTINATION include)`
+- **Bazel equivalent**: Include in `hdrs` attribute
+- **Explanation**: CMake install rules indicate which headers are part of public API
+- **Applicable situations**: When determining which headers should be public vs private in Bazel
+
+##### CMake compiler definitions
+- **CMake pattern**: `target_compile_definitions(target PRIVATE DEFINE_NAME)`
+- **Bazel equivalent**: `defines = ["DEFINE_NAME"]` in target
+- **Explanation**: CMake compile definitions map to Bazel defines attribute
+- **Applicable situations**: When CMake sets preprocessor definitions
+
+##### CMake test target with cmocka
+- **CMake pattern**: `add_cmocka_test(test_name SOURCES test.c)`
+- **Bazel equivalent**:
+  ```starlark
+  cc_test(
+      name = "test_name",
+      srcs = ["test.c"],
+      deps = [":cmocka_library"],
+  )
+  ```
+- **Explanation**: CMake test utilities map to standard Bazel cc_test with appropriate dependencies
+- **Applicable situations**: When CMake uses framework-specific test helper functions
+
 ### Process Guidelines
 
 #### Initial workspace setup sequence
@@ -376,10 +467,11 @@ Include in your summary the following:
    - **Timing**: After target discovery verification succeeds
 
 3. **Command**: `bazel test --test_output=all //...`
-   - **Explanation**: Runs all test targets to verify they execute correctly
-   - **Applicable situations**: Running all test targets
-   - **Expected output**: Test pass/fail summary with both bazel and the original test script reporting all passing tests
+   - **Explanation**: Runs all test targets to verify they execute correctly and provides complete test output for analysis
+   - **Applicable situations**: Running all test targets to verify conversion success
+   - **Expected output**: Complete test output with pass/fail details for all tests
    - **Timing**: After build verification succeeds
+   - **Additional benefit**: Using `--test_output=all` eliminates need to run tests multiple times to see results
 
 #### Troubleshooting zero targets found
 - **Command**: `bazel query //...`
@@ -451,3 +543,11 @@ Include in your summary the following:
 - **Applicable situations**: When Makefile contains targets with names like `testcpp` that use `$(CPPC)` or `g++` on C source files
 - **Expected findings**: Testing artifacts rather than genuine build requirements
 - **Key indicators**: Targets using different compiler variables on identical source files, compiler flags without language-specific requirements
+
+#### CMake install analysis for API boundary detection
+- **Method**: Examine CMake `install()` commands to identify public vs private headers
+- **Explanation**: CMake install rules definitively show which headers are intended as public API
+- **Applicable situations**: When converting CMake-based projects with complex header hierarchies
+- **Expected findings**: Clear distinction between public and private headers
+- **Key indicators**: Headers listed in `install(FILES ... DESTINATION include)` are public API
+
