@@ -37,29 +37,21 @@ Preserve the existing style and structure of rules.md while enhancing sections t
 **Output format**: Create a new file called `rules.new.md` as part of your summary that incorporates all improvements and discoveries from this conversion. This should be a complete, updated version of the rules that can be used for future translations.
 
 Include in your summary the following:
-
 1. Bazel Best Practices:
   * Summarize all Bazel best practices discovered during the conversion process.
   * For each best practice, document:
-    - Specific examples with context and explanation
-    - Applicable situations: when this best practice should be used (based only on actual scenarios encountered during the current conversion)
-    - Exceptions: cases where this best practice should be avoided or modified (based only on actual exceptions found during the current conversion)
-    - Leave situation and exception sections blank rather than making assumptions or guesses
+    - **Explanation**: A clear description of the practice and why it's beneficial
+    - **Example**: Specific implementation showing the best practice in action with context
+    - **Applicable situations**: When this best practice should be used (based only on actual scenarios encountered during the current conversion)
+    - **What to avoid**: Explanation of practices that violate this best practice, with specific examples of what not to do
+    - **Additional things to avoid**: If multiple distinct anti-patterns relate to this best practice, document each separately with explanations and examples
+    - **Exceptions**: Cases where this best practice should be avoided or modified (based only on actual exceptions found during the current conversion)
+    - **Additional things to avoid**: If multiple distinct exceptions to this best practice, document each separately with explanations and examples
+  * Leave situation and exception sections blank rather than making assumptions or guesses
   * Update existing best practices with new discoveries that improve their flexibility and applicability across a wider range of cases.
   * Focus on practices that have been validated through actual conversion experience rather than theoretical guidelines.
 
-2. Bazel Anti-Patterns:
-  * Summarize all Bazel  anti-patterns encountered during the conversion.
-  * For each  anti-patterns, document:
-    - Specific examples explaining why the practice should be avoided
-    - Applicable situations: contexts where this anti-pattern typically occurs (based only on actual instances found during the current conversion)
-    - Exceptions: rare cases where this practice might be acceptable or unavoidable (based only on actual exceptions encountered during the current conversion)
-    - Alternative approaches: recommended best practices to use instead
-    - Leave situation and exception sections blank rather than making assumptions or guesses
-  * Update existing  anti-patterns with new discoveries that expand their scope and improve recognition of potential pitfalls.
-  * Focus on anti-patterns that have been observed in actual conversion work rather than theoretical concerns.
-
-3. Translation Dictionary:
+2. Translation Dictionary:
   * Create a comprehensive translation dictionary mapping source build concepts to Bazel equivalents.
   * Categorize translations by source build system (e.g., Make, CMake, Autotools).
   * For each translation, document:
@@ -69,7 +61,7 @@ Include in your summary the following:
   * Update existing dictionary entries with new discoveries that improve translation flexibility and clarity.
   * Focus on translations that have been validated through actual migration experience rather than theoretical mappings.
 
-4. Process Guidelines:
+3. Process Guidelines:
   * Document all Bazel commands, workflows, and diagnostic techniques discovered during the conversion process.
   * For each command or process step, document:
     - Specific command syntax and flags used
@@ -83,7 +75,7 @@ Include in your summary the following:
   * Include timing recommendations: when in the conversion process each command is most effective.
   * Document command combinations and sequences that proved particularly useful during the conversion.
 
-5. Original Build Analysis Guidelines:
+4. Original Build Analysis Guidelines:
   * Document all techniques, tools, and approaches discovered for understanding the source build system during the conversion process.
   * For each analysis technique, document:
     - Specific commands, tools, or methods used to analyze the original build
@@ -102,17 +94,28 @@ Include in your summary the following:
 ### Bazel Best Practices
 
 #### Use bzlmod over legacy WORKSPACE
-- **Example**: Replace `workspace(name = "sds")` in WORKSPACE file with `MODULE.bazel` containing:
+- **Explanation**: bzlmod is the modern Bazel dependency management system that provides better version resolution, cleaner configuration, and improved maintainability compared to legacy WORKSPACE files. It eliminates many of the complexities and conflicts that arise with traditional WORKSPACE-based dependency management.
+- **Example**: Create `MODULE.bazel` containing the module and dependencies definition:
   ```starlark
   module(
-      name = "sds",
+      name = "name",
       version = "1.0.0",
   )
   
   bazel_dep(name = "rules_cc", version = "0.1.2")
   ```
-- **Explanation**: bzlmod is the modern Bazel dependency management system that provides better version resolution and cleaner configuration compared to legacy WORKSPACE files
 - **Applicable situations**: All new Bazel projects should use bzlmod for dependency management
+- **What to avoid**: Creating new `workspace(name = "project")` files instead of using `MODULE.bazel`. Legacy WORKSPACE files are harder to maintain, have worse dependency resolution, and have been phased out in favor of bzlmod. For example, avoid:
+  ```starlark
+  workspace(name = "project")
+  
+  load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+  http_archive(
+      name = "rules_cc",
+      urls = ["https://github.com/bazelbuild/rules_cc/archive/refs/tags/0.1.2.tar.gz"],
+      strip_prefix = "rules_cc-0.1.2",
+  )
+  ```
 
 #### Use latest versions of Bazel rules
 - **Example**: Use `rules_cc` version `0.1.2` instead of older versions in MODULE.bazel
@@ -120,9 +123,15 @@ Include in your summary the following:
   * `rules_cc`: `0.1.2`
   * `platforms`: `1.0.0`
 - **Applicable situations**: When setting up dependencies in MODULE.bazel
+- **What to avoid**: Using outdated versions of Bazel rules that may contain bugs, security issues, or lack important features. For example, avoid:
+  ```starlark
+  bazel_dep(name = "rules_cc", version = "0.0.9")    # Outdated version
+  bazel_dep(name = "platforms", version = "0.0.8")   # Outdated version
+  ```
 
-#### Produce well-scoped targets
-- **Example**: Create both `cc_library` and `cc_test` targets:
+#### Use dependencies between targets
+- **Explanation**: Using `deps` allows Bazel to manage dependencies correctly, ensuring proper build order and enabling incremental builds. This creates a clean separation between library code and test code, making builds more efficient and maintainable.
+- **Example**: Make test targets depend on library targets:
   ```starlark
   cc_library(
       name = "library",
@@ -130,55 +139,115 @@ Include in your summary the following:
       hdrs = ["lib.h"],
       visibility = ["//visibility:public"],
   )
-  
   cc_test(
       name = "test",
       srcs = ["tests.c"],
+      deps = [":library"],
+  )
+  ```
+- **Applicable situations**: When a target relies on code from another target
+- **What to avoid**: Replicating library sources and headers in test targets when proper dependency management is possible. This leads to unnecessary compilation overhead and maintenance burden. For example, avoid:
+  ```starlark
+  cc_library(
+      name = "library",
+      srcs = ["lib.c"],
+      hdrs = ["lib.h"],
+  )
+  cc_test(
+      name = "test",
+      srcs = [
+          "tests.c",
+          "lib.c",  # Avoid duplicating library sources
+      ],
+      hdrs = ["lib.h"],  # Avoid duplicating library headers
+  )
+  ```
+- **Exceptions**: Cannot be used when tests are embedded in source files using conditional compilation. When tests are conditionally compiled within the same source files (like `#ifdef TEST_MAIN`), the library target is compiled without test defines, so the test target cannot use it and must compile the source files directly with appropriate defines.
+  ```starlark
+  cc_library(
+      name = "library",
+      srcs = ["lib.c"],
+      hdrs = ["lib.h"],
+  )
+  cc_test(
+      name = "test",
+      srcs = ["lib.c", "lib.h"],  # Replicate source and header files
       defines = ["TESTS_MAIN"],
   )
   ```
-- **Explanation**: Well-scoped targets improve modularity, reusability, and build performance by allowing Bazel to build only what's necessary
-- **Applicable situations**: When translating build systems with multiple outputs or components
-
-#### Use dependencies between targets
-- **Example**: Make test targets depend on library targets:
-  ```starlark
-  cc_test(
-      name = "sds-test",
-      srcs = ["sds-test.c"],
-      deps = [":sds"],
-  )
-  ```
-- **Explanation**: Using `deps` allows Bazel to manage dependencies correctly, ensuring proper build order and enabling incremental builds
-- **Applicable situations**: When a target relies on code from another target
-- **Exceptions**: Cannot be used when tests are embedded in source files using conditional compilation
 
 #### Use `cc_test` for test targets instead of `cc_binary`
-- **Example**: Use `cc_test(name = "test", ...)` not `cc_binary(name = "test", ...)`
-- **Explanation**: `cc_test` integrates with Bazel's test infrastructure, enabling features like test result reporting, parallel execution, and proper test discovery
+- **Explanation**: `cc_test` integrates with Bazel's test infrastructure, enabling features like test result reporting, parallel execution, proper test discovery, and standardized test execution. This provides better visibility into test results and allows Bazel to manage test execution more effectively.
+- **Example**: Use `cc_test(name = "test", ...)` not `cc_binary(name = "test", ...)`:
+  ```starlark
+  cc_test(
+      name = "unit_test",
+      srcs = ["test.c"],
+      deps = [":library"],
+  )
+  ```
 - **Applicable situations**: Any executable that runs tests should use `cc_test`
+- **What to avoid**: Using `cc_binary` for test executables. `cc_binary` targets don't integrate with Bazel's test framework, missing features like test reporting and proper test discovery. For example, avoid:
+  ```starlark
+  cc_binary(
+      name = "test-name",
+      srcs = ["test.c"],
+      deps = [":library"],
+  )
+  ```
 
 #### Preserve original compiler flags and defines
-- **Example**: Maintain original flags like `-O0 -g -Wall -Wextra -std=c89 -pedantic-errors` in `copts`
-- **Explanation**: Original compiler flags ensure the Bazel build produces equivalent behavior and catches the same issues as the original build system
+- **Explanation**: Original compiler flags ensure the Bazel build produces equivalent behavior and catches the same issues as the original build system. This maintains build consistency and helps prevent regressions when migrating from other build systems.
+- **Example**: Maintain original flags like `-O0 -g -Wall -Wextra -std=c89 -pedantic-errors` in `copts`:
+  ```starlark
+  cc_library(
+      name = "library",
+      srcs = ["lib.c"],
+      hdrs = ["lib.h"],
+      copts = ["-O0", "-g", "-Wall", "-Wextra", "-std=c89", "-pedantic-errors"],
+  )
+  ```
 - **Applicable situations**: When the original build system specifies particular compiler behavior
 
-#### Handle embedded tests with conditional compilation properly
-- **Example**: For `#ifdef TESTS_MAIN` in source files, replicate all source files in the test target with `defines = ["TESTS_MAIN"]`
-- **Explanation**: When tests are conditionally compiled within source files, the test target must compile the source files directly with the test defines rather than depending on the library target, which breaks the normal dependency pattern but is necessary for this compilation model
-- **Applicable situations**: When examining source files reveals conditional test compilation blocks
-
 #### Explicitly load cc rules in BUILD files
-- **Example**: Add `load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary", "cc_test")` at the top of BUILD files.
-- **Explanation**: Modern rules_cc requires explicit loading of cc rules rather than relying on implicit availability, improving build clarity and compatibility
+- **Explanation**: Modern rules_cc requires explicit loading of cc rules rather than relying on implicit availability. This improves build clarity, makes dependencies explicit, and ensures compatibility with current Bazel versions.
+- **Example**: Add `load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary", "cc_test")` at the top of BUILD files:
+  ```starlark
+  load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary", "cc_test")
+  
+  cc_library(
+      name = "library",
+      srcs = ["lib.c"],
+      hdrs = ["lib.h"],
+  )
+  ```
 - **Applicable situations**: When using cc_library, cc_test, or other cc rules in BUILD files
+- **What to avoid**: Using cc rules without explicit load
+  ```starlark
+  # avoid using cc_library without the load at the top of the file
+  
+  cc_library(
+      name = "library",
+      srcs = ["lib.c"],
+      hdrs = ["lib.h"],
+  )
+  ```
 
 #### Include data files for tests that read external files
-- **Example**: Add `data = glob(["tests/*.txt"])` to test targets that read test data files
-- **Explanation**: Test targets need explicit data dependencies to access files during test execution in Bazel's sandbox environment
+- **Explanation**: Test targets need explicit data dependencies to access files during test execution in Bazel's sandbox environment. Without these dependencies, tests will fail because they cannot find the required files at runtime.
+- **Example**: Add `data = glob(["tests/*.txt"])` to test targets that read test data files:
+  ```starlark
+  cc_test(
+      name = "test",
+      srcs = ["test.c"],
+      data = glob(["tests/*.txt"]),
+      deps = [":library"],
+  )
+  ```
 - **Applicable situations**: When tests read configuration files, test data, or other external files during execution
 
-#### Modify source files for Bazel sandbox compatibility when necessary
+
+#### Modify source files for Bazel sandbox compatibility only when necessary
 - **Example**: Modify file paths in test code to use `$TEST_TMPDIR` for writable files:
   ```c
   const char* get_file_path(const char *filename) {
@@ -199,32 +268,6 @@ Include in your summary the following:
   ```
 - **Explanation**: Bazel's test sandbox prevents writing to data directories, so tests that create temporary files must use `$TEST_TMPDIR` to maintain functionality while following Bazel security practices
 - **Applicable situations**: When tests fail due to file I/O permission errors in Bazel sandbox and functionality preservation requires minimal source modification
-
-### Bazel Anti-Patterns
-
-#### Using legacy WORKSPACE when bzlmod is available
-- **Example**: Creating new `workspace(name = "project")` files instead of using `MODULE.bazel`
-- **Explanation**: Legacy WORKSPACE files are harder to maintain, have worse dependency resolution, and have been phased out in favor of bzlmod
-- **Alternative approaches**: Always use bzlmod (MODULE.bazel) for new projects
-- **Applicable situations**: Always
-
-#### Using `cc_binary` for test executables
-- **Example**: Defining `cc_binary(name = "test-name", ...)` for test programs
-- **Explanation**: `cc_binary` targets don't integrate with Bazel's test framework, missing features like test reporting and proper test discovery
-- **Alternative approaches**: Use `cc_test` to integrate properly with Bazel's test framework
-- **Applicable situations**: When converting Makefile targets that produce test executables
-
-#### Attempting library dependency for embedded conditional tests
-- **Example**: Trying to make test target depend on library when tests are conditionally compiled within the same source files
-- **Explanation**: When tests are embedded using conditional compilation, the library target is compiled without test defines, so the test target cannot use it and must compile the source files directly
-- **Alternative approaches**: Replicate source files in test target with appropriate defines
-- **Applicable situations**: When source code analysis reveals `#ifdef TEST_MAIN` or similar patterns
-
-#### Translating cross-language compilation patterns
-- **Example**: Creating `cc_test` targets that use C++ compiler on C source files like Makefile `testcpp` targets
-- **Explanation**: Cross-language compilation is often a testing artifact rather than a genuine build requirement and adds unnecessary complexity to Bazel builds
-- **Alternative approaches**: Focus on building proper language-specific targets and use Bazel's native multi-language support for genuine interoperability needs
-- **Applicable situations**: When Makefile contains targets using different compilers on the same source files
 
 ### Translation Dictionary
 
