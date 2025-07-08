@@ -9,6 +9,7 @@ Currently sourcing projects from: https://project-awesome.org/inputsh/awesome-c
 * https://github.com/reutermj/sds
 * https://github.com/reutermj/parson
 * https://github.com/reutermj/wjelement
+* https://github.com/reutermj/cmocka
 
 ## Future projects
 
