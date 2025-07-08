@@ -10,18 +10,32 @@
 - Base all suggested improvements to rules.new.md on actual conversion experience, not speculation
 - Preserve existing rules even if they're not used in the current translation
 - **Avoid redundancy** - focus on adding rules to the section where they're most relevant and avoid duplicating content across multiple sections
-5. **Produce a detailed conversion log** - Create a comprehensive log file called bazel-conversion.md documenting the conversion process specific to this project. This log should capture project-specific challenges, solutions, and decisions made during the conversion to aid future conversions of updated versions of the same project. Include details such as:
-   - Project-specific build patterns encountered
-   - Dependency resolution challenges and solutions
-   - Source modifications made and why they were necessary
-   - Build target organization decisions
-   - Test configuration adaptations
-   - Any project-specific workarounds or customizations
+5. **5. Produce a detailed conversion log** - Create a comprehensive log file called `conversion-log.md` documenting the conversion process specific to this project. This log should capture project-specific challenges, solutions, and decisions made during the conversion to aid future conversions of updated versions of the same project.
+- Document every build configuration translation with exact source-to-target mappings:
+  * **Original Source**: Complete original build system configuration (CMake, Make, etc.)
+  * **Bazel Translation**: Corresponding Bazel BUILD rule(s)
+  * **Mapping Rationale**: Why this specific translation approach was chosen
+  * **Discovery Process**: How you identified what the original build system was doing
+- For every source file that required modification:
+  * **Original Source Code**: Exact original code block that needed changes
+  * **Output Source Code**: Exact output code block
+  * **Modification Rationale**: Why the change was necessary for Bazel compatibility
+  * **Discovery Process**: Step-by-step process of how you discovered this change was needed (what failed, what errors occurred, how you diagnosed the issue)
+  * **Failure Symptoms**: Specific error messages or behaviors that led to identifying the need for this change
+- For every file that was moved, renamed, or restructured:
+  * **File Movement Mapping**: Original location → New location
+  * **Movement Rationale**: Why the move was necessary for Bazel
+  * **Discovery Process**: How you identified the need for the move (what constraint or requirement drove this)
+  * **Impact Analysis**: What other files or configurations were affected by this move
+- Document every interaction during the conversion process (except the initial prompt with this rules file):
+  * **Human Prompt**: Exact prompt text given to the agent
+  * **Prompt Purpose**: Why this specific prompt was necessary at this point in the conversion
+  * **Agent Response Summary**: Key outcomes, actions taken, or solutions provided by the agent
+  * **Success/Failure**: Whether the prompt achieved its intended goal
+  * **Follow-up Required**: What additional prompts or iterations were needed
 6. **Update module index** - Add an entry to `module-index.md` documenting the converted module for future reference. The entry should include:
    - The `bazel_dep` declaration needed to depend on this converted module
    - A list of the main public targets that other conversions would typically want to depend on
-   - Brief descriptions of what each public target provides
-   - Any notable configuration or usage considerations specific to this module
 
 ## Detailing future improvements
 
@@ -321,6 +335,22 @@ Include in your summary the following:
 - **Applicable situations**: When tests need access to internal functions not exposed in public API and originally include source files directly
 - **What to avoid**: Duplicating source files in test targets or exposing internal functions in public API unnecessarily
 
+#### Modify test exit codes for framework compatibility when necessary
+- **Explanation**: Some test frameworks return failure count as exit code, but Bazel expects tests to return 0 for success. When migrating such tests, modify the main function to return 0 when the expected number of test failures occur.
+- **Example**: Modify cmocka test exit codes for "_fail" tests:
+  ```c
+  int main(void) {
+      const struct CMUnitTest tests[] = {
+          cmocka_unit_test(test_assert_true_fail),
+      };
+      int result = cmocka_run_group_tests(tests, NULL, NULL);
+      int expected_failures = 1; // Number of tests expected to fail
+      return (result == expected_failures) ? 0 : 1;
+  }
+  ```
+- **Applicable situations**: When converting cmocka-based tests or other frameworks that return failure counts as exit codes
+- **What to avoid**: Leaving test exit codes unchanged when they conflict with Bazel's test success expectations, causing false test failures
+
 ### Translation Dictionary
 
 #### Make to Bazel Translations
@@ -440,6 +470,30 @@ Include in your summary the following:
 - **Explanation**: CMake test utilities map to standard Bazel cc_test with appropriate dependencies
 - **Applicable situations**: When CMake uses framework-specific test helper functions
 
+##### CMake test loop pattern
+- **CMake pattern**: 
+  ```cmake
+  foreach(_TEST ${TESTS})
+      add_cmocka_test(${_TEST} SOURCES ${_TEST}.c)
+  endforeach()
+  ```
+- **Bazel equivalent**:
+  ```starlark
+  [cc_test(
+      name = test_name,
+      srcs = [test_name + ".c"],
+      deps = [":library"],
+  ) for test_name in ALL_TESTS]
+  ```
+- **Explanation**: CMake loops over test lists map to Bazel list comprehensions for efficient target generation
+- **Applicable situations**: When CMake generates multiple similar test targets from a list
+
+##### CMake compiler flags preservation
+- **CMake pattern**: `target_compile_options(target PRIVATE ${DEFAULT_C_COMPILE_FLAGS} -DHAVE_CONFIG_H)`
+- **Bazel equivalent**: `copts = ["-std=c99", "-DHAVE_CONFIG_H", "-D_GNU_SOURCE"]`
+- **Explanation**: CMake compile options transfer directly to Bazel copts attribute
+- **Applicable situations**: When CMake sets specific compiler behavior that must be preserved
+
 ### Process Guidelines
 
 #### Initial workspace setup sequence
@@ -501,6 +555,20 @@ Include in your summary the following:
 - **Expected output**: Identical test output between original and Bazel builds
 - **Timing**: Final verification step after successful Bazel build and test
 
+#### Test exit code diagnosis and resolution
+- **Command**: `bazel test //... --test_summary=detailed`
+- **Explanation**: Provides detailed test results showing exit codes for failed tests, enabling identification of exit code mismatches
+- **Applicable situations**: When tests fail with non-zero exit codes but are expected to pass
+- **Expected output**: Test summary showing "Exit 1", "Exit 3" etc. for tests that should pass
+- **Troubleshooting steps**: Examine test framework exit code semantics and modify test main functions if framework returns failure counts instead of 0/1
+
+#### Incremental test validation workflow
+- **Command sequence**: Modify small batches of tests, then verify with `bazel test <batch>`
+- **Explanation**: When applying systematic fixes to many tests, validate in small batches to isolate issues quickly
+- **Applicable situations**: When modifying many test files with similar patterns (e.g., exit code changes)
+- **Expected output**: Gradual progression from failing tests to passing tests
+- **Timing**: During systematic test modifications to catch issues early
+
 ### Original Build Analysis Guidelines
 
 #### Makefile examination techniques
@@ -551,3 +619,23 @@ Include in your summary the following:
 - **Expected findings**: Clear distinction between public and private headers
 - **Key indicators**: Headers listed in `install(FILES ... DESTINATION include)` are public API
 
+#### CMake configuration complexity assessment
+- **Method**: Examine CMake configuration files like `ConfigureChecks.cmake` and `config.h.cmake`
+- **Explanation**: Complex CMake configuration detection can often be simplified with static configuration files for specific target platforms
+- **Applicable situations**: When CMake projects use extensive feature detection and configuration generation
+- **Expected findings**: Large numbers of feature checks that may be simplified for target platform
+- **Key indicators**: Files with `check_function_exists`, `check_include_file`, complex `#cmakedefine` templates
+
+#### Source inclusion anti-pattern detection
+- **Method**: Use `grep_search` to find `#include "../src/*.c"` patterns in test files
+- **Explanation**: Tests including source files directly indicate need for private library pattern to access internal functions
+- **Applicable situations**: When tests need access to internal functions not exposed in public API
+- **Expected findings**: Test files including implementation files for internal access
+- **Key indicators**: `#include` directives pointing to source files rather than headers, comments about needing internal functions
+
+#### Test framework exit code analysis
+- **Method**: Run tests and examine exit codes to understand test framework semantics
+- **Explanation**: Different test frameworks have different exit code conventions that may conflict with Bazel's expectations
+- **Applicable situations**: When initial test runs show systematic failures with specific exit codes
+- **Expected findings**: Test frameworks that return failure counts rather than 0/1 exit codes
+- **Key indicators**: Tests failing with exit codes that match number of test failures, "_fail" suffix tests that should pass
