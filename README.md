@@ -10,6 +10,9 @@ Currently sourcing projects from: https://project-awesome.org/inputsh/awesome-c
 * https://github.com/reutermj/parson
 * https://github.com/reutermj/wjelement
 * https://github.com/reutermj/cmocka
+* https://github.com/reutermj/cmp
+  * first project that depended on another: cmocka
+  * limitation: didnt convert any targets that depended on gperftools  
 
 ## Future projects
 

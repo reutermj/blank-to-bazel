@@ -351,6 +351,21 @@ Include in your summary the following:
 - **Applicable situations**: When converting cmocka-based tests or other frameworks that return failure counts as exit codes
 - **What to avoid**: Leaving test exit codes unchanged when they conflict with Bazel's test success expectations, causing false test failures
 
+#### Add missing includes for C89 compatibility with modern libraries
+- **Explanation**: When using modern C libraries with C89 code, some standard headers may not be automatically included. Adding the necessary includes ensures compatibility without changing the underlying C standard or API usage.
+- **Example**: Add stdint.h for CMocka compatibility:
+  ```c
+  #include <setjmp.h>
+  #include <stdarg.h>
+  #include <stddef.h>
+  #include <stdint.h>    // Add for intmax_t, uintmax_t definitions
+  #include <stdlib.h>
+  
+  #include <cmocka.h>
+  ```
+- **Applicable situations**: When C89 code uses libraries that depend on types defined in headers not automatically included in C89
+- **What to avoid**: Changing the entire codebase to a newer C standard when only a simple include is needed
+
 ### Translation Dictionary
 
 #### Make to Bazel Translations
@@ -430,6 +445,40 @@ Include in your summary the following:
 - **Bazel equivalent**: Add `data = glob(["tests/*.txt"])` to test targets
 - **Explanation**: Bazel's sandbox isolates tests from the filesystem, so data files must be explicitly declared as dependencies
 - **Applicable situations**: When tests read external files during execution
+
+##### Complex compiler flag aggregation
+- **Make pattern**: 
+  ```makefile
+  EXTRA_CFLAGS ?= -Werror -Wall -Wextra -funsigned-char -fwrapv -Wconversion
+  TESTCFLAGS ?= -std=c99 -Wno-error=deprecated-declarations -O0
+  target: $(CC) $(EXTRA_CFLAGS) $(TESTCFLAGS) source.c
+  ```
+- **Bazel equivalent**:
+  ```starlark
+  cc_test(
+      name = "target",
+      srcs = ["source.c"],
+      copts = [
+          "-Werror", "-Wall", "-Wextra", "-funsigned-char", "-fwrapv", 
+          "-Wconversion", "-std=c99", "-Wno-error=deprecated-declarations", "-O0"
+      ],
+  )
+  ```
+- **Explanation**: Makefile variable aggregation of compiler flags maps to a single flattened copts list in Bazel
+- **Applicable situations**: When Makefiles use multiple variables to build up complex compiler flag sets
+
+##### Library linking
+- **Make pattern**: `$(CC) -o target source.c test_utils.c -lcmocka`
+- **Bazel equivalent**:
+  ```starlark
+  cc_test(
+      name = "target",
+      srcs = ["source.c"],
+      deps = [":test_utils", "@cmocka//:cmocka"],
+  )
+  ```
+- **Explanation**: External library linking (-l flags) maps to external dependencies in deps, while local object files become local cc_library dependencies
+- **Applicable situations**: When Makefile links multiple source files and external libraries together
 
 #### CMake to Bazel Translations
 
