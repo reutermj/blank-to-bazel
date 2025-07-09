@@ -12,7 +12,8 @@ Currently sourcing projects from: https://project-awesome.org/inputsh/awesome-c
 * https://github.com/reutermj/cmocka
 * https://github.com/reutermj/cmp
   * first project that depended on another: cmocka
-  * limitation: didnt convert any targets that depended on gperftools  
+  * limitation: didnt convert any targets that depended on gperftools
+* https://github.com/reutermj/libcrc
 
 ## Future projects
 
@@ -26,4 +27,6 @@ https://github.com/reutermj/yajl
 
 https://github.com/reutermj/simdjson
 * the implementation of this `#include`s a bunch of .cpp files
-* 
+
+https://github.com/PeterScott/murmur3
+* at this point, too much of a low hanging fruit, but would be nice to do at some point

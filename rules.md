@@ -366,6 +366,48 @@ Include in your summary the following:
 - **Applicable situations**: When C89 code uses libraries that depend on types defined in headers not automatically included in C89
 - **What to avoid**: Changing the entire codebase to a newer C standard when only a simple include is needed
 
+#### Use genrule for custom tool-based file generation
+- **Explanation**: When the original build system uses custom tools to generate source files or lookup tables, genrule provides a clean way to model this dependency in Bazel. The `tools` attribute ensures the tool is built before execution.
+- **Example**: Generate lookup tables using a custom tool:
+  ```starlark
+  cc_binary(
+      name = "generator_tool",
+      srcs = ["tool/generator.c"],
+  )
+  
+  genrule(
+      name = "gen_lookup_table",
+      outs = ["tab/lookup.inc"],
+      cmd = "$(location :generator_tool) --output $@",
+      tools = [":generator_tool"],
+  )
+  
+  cc_library(
+      name = "library",
+      srcs = [
+          "src/lib.c",
+          ":gen_lookup_table",
+      ],
+      includes = ["tab"],  # Allow relative includes to find generated files
+  )
+  ```
+- **Applicable situations**: When original build systems have custom code generation steps or table pre-computation
+
+#### Adjust includes path for generated file access
+- **Explanation**: When source files use relative includes to access generated files, adding the generated file's directory to includes allows the relative path to resolve correctly in Bazel's sandbox without modifying source code.
+- **Example**: Add "tab" to includes for generated table files:
+  ```starlark
+  cc_library(
+      name = "library",
+      srcs = [
+          "src/lib.c",           # Contains #include "../tab/lookup.inc"
+          ":gen_lookup_table",   # Generates tab/lookup.inc
+      ],
+      includes = ["include", "tab"],  # "tab" allows ../tab/ to resolve from src/
+  )
+  ```
+- **Applicable situations**: When source files use relative includes (like `../tab/file.inc`) to access generated files and avoiding source modification is preferred
+
 ### Translation Dictionary
 
 #### Make to Bazel Translations
@@ -445,6 +487,71 @@ Include in your summary the following:
 - **Bazel equivalent**: Add `data = glob(["tests/*.txt"])` to test targets
 - **Explanation**: Bazel's sandbox isolates tests from the filesystem, so data files must be explicitly declared as dependencies
 - **Applicable situations**: When tests read external files during execution
+
+##### Generated file dependencies with custom tools
+- **Make pattern**: 
+  ```makefile
+  tool: tool_sources
+  	$(CC) -o tool tool_sources
+  
+  generated.inc: tool
+  	./tool --output generated.inc
+  
+  target: source.c generated.inc
+  	$(CC) -o target source.c
+  ```
+- **Bazel equivalent**:
+  ```starlark
+  cc_binary(
+      name = "tool",
+      srcs = ["tool_sources"],
+  )
+  
+  genrule(
+      name = "gen_file",
+      outs = ["generated.inc"],
+      cmd = "$(location :tool) --output $@",
+      tools = [":tool"],
+  )
+  
+  cc_binary(
+      name = "target",
+      srcs = ["source.c", ":gen_file"],
+  )
+  ```
+- **Explanation**: Makefile tool-based generation translates to cc_binary for the tool plus genrule for the generation step
+- **Applicable situations**: When Makefiles use custom tools to generate source files during build
+
+##### Static library creation from object files
+- **Make pattern**:
+  ```makefile
+  lib.a: obj1.o obj2.o obj3.o
+  	ar qc lib.a obj1.o obj2.o obj3.o
+  	ranlib lib.a
+  ```
+- **Bazel equivalent**:
+  ```starlark
+  cc_library(
+      name = "lib",
+      srcs = ["src1.c", "src2.c", "src3.c"],
+      hdrs = ["public.h"],
+  )
+  ```
+- **Explanation**: Makefile static library creation with ar/ranlib maps to cc_library in Bazel
+- **Applicable situations**: When Makefile creates static libraries from compiled object files
+
+##### Include path specification
+- **Make pattern**: `$(CC) -Iinclude_dir -o target source.c`
+- **Bazel equivalent**:
+  ```starlark
+  cc_binary(
+      name = "target",
+      srcs = ["source.c"],
+      includes = ["include_dir"],
+  )
+  ```
+- **Explanation**: Makefile `-I` flags for include directories map to the `includes` attribute in Bazel
+- **Applicable situations**: When Makefile specifies additional include search paths
 
 ##### Complex compiler flag aggregation
 - **Make pattern**: 
@@ -618,6 +725,21 @@ Include in your summary the following:
 - **Expected output**: Gradual progression from failing tests to passing tests
 - **Timing**: During systematic test modifications to catch issues early
 
+#### Verbose compiler output for include path debugging
+- **Command**: `bazel build --copt="-v" target_name`
+- **Explanation**: Shows detailed compiler invocation including all include search paths, which is crucial for debugging relative include issues with generated files
+- **Applicable situations**: When source files cannot find included files, especially generated files or files with relative includes
+- **Expected output**: Compiler verbose output showing:
+  ```
+  #include "..." search starts here:
+  .
+  bazel-out/k8-fastbuild/bin
+  #include <...> search starts here:
+  include
+  /usr/include
+  ```
+- **Troubleshooting steps**: Compare the include search paths with the expected location of missing files to determine if includes path adjustment is needed
+
 ### Original Build Analysis Guidelines
 
 #### Makefile examination techniques
@@ -688,3 +810,17 @@ Include in your summary the following:
 - **Applicable situations**: When initial test runs show systematic failures with specific exit codes
 - **Expected findings**: Test frameworks that return failure counts rather than 0/1 exit codes
 - **Key indicators**: Tests failing with exit codes that match number of test failures, "_fail" suffix tests that should pass
+
+#### Makefile dependency chain identification
+- **Method**: Trace Makefile target dependencies to understand build ordering
+- **Explanation**: Following the dependency chain reveals which targets must be built before others and helps identify code generation steps
+- **Applicable situations**: When converting Makefiles with complex dependencies or generated files
+- **Expected findings**: Clear understanding of build phases, such as tool building → file generation → library compilation → test linking
+- **Key indicators**: Look for targets that depend on tools (like `generated.inc: tool`), custom file extensions (`.inc`, `.gen`), and multi-step compilation
+
+#### Live build observation for generation patterns
+- **Method**: Run `make clean && make` and observe the build sequence and output
+- **Explanation**: Watching the actual build process reveals the true execution order and any build-time code generation
+- **Applicable situations**: When static analysis of build files doesn't reveal the complete build process
+- **Expected findings**: Actual compiler commands, tool execution order, and generated file creation
+- **Key indicators**: Custom tools being built and executed, temporary files being created, multi-stage compilation
