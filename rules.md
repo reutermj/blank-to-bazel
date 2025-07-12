@@ -2,9 +2,16 @@
 
 ## Instructions
 
-1. Assess the existing build system first to understand its structure, dependencies, and build semantics.
+1. Assess the existing build system first to understand its structure, dependencies, and build semantics. Before moving onto the next step, create a summary of all build steps including:
+- Step name/type
+- Purpose
+- Inputs
+- Outputs
+- Key Parameters
+- Dependencies
+- How the step typically translates to bazel build steps
 2. Convert the build script in this repo to a Bazel build configuration that preserves the original build semantics.
-3. **Minimize source file modifications** - the goal is to get the original sources building with Bazel while avoiding changes to the underlying codebase. Only modify source files when absolutely necessary to get the build and tests to pass in the Bazel environment. If modifications are necessary, make them as minimal as possible.
+3. **Do not modify source files unless instructed** - the goal is to get the original sources building with Bazel while avoiding changes to the underlying codebase.
 4. As part of the summary, write out a rules.new.md that includes a revision of this file with the considerations outlined in: Detailing future improvements.
 - **Do not modify the "Instructions" and "Detailing future improvements" sections** of the rules.md file when creating rules.new.md.
 - Base all suggested improvements to rules.new.md on actual conversion experience, not speculation
