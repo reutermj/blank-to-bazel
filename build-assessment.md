@@ -1,63 +1,54 @@
-# Assess existing build system
+# Assess Existing Build System
+
+This document provides instructions for analyzing existing build systems to understand what they accomplish and how they work. The goal is to create comprehensive assessments that document the build system's intent and mechanisms, while simultaneously building a knowledge base of interpretation patterns that can be applied to future build system analyses.
 
 For every build script present:
-1. Read the existing `build-assessment-guidelines.<build system>.md` to understand best practices and guidelines for assessing the build system.
+1. Read the existing `build-interpretation-runbook.<build system>.md` to understand patterns and approaches for interpreting the build system.
 2. Assess the existing build system first to understand its structure, dependencies, and build semantics.
 3. Build Assessment Creation: create a `build-assessment.<project>.<build system>.md` file that provides a complete analysis of the current build system.
-4. Guideline Maintenance: update `build-assessment-guidelines.<build system>.md` files to preserve knowledge for future assessments.
+4. Interpretation Runbook Maintenance: update `build-interpretation-runbook.<build system>.md` files to preserve knowledge for future assessments.
 
----
+## Build Assessment (`build-assessment.<project>.<build system>.md`)
 
-## Build Assessment Requirements (`build-assessment.<project>.<build system>.md`)
+The build assessment documents what the current build system accomplishes and how it works. This serves as a comprehensive record of the build system's intent, structure, and mechanisms that can be referenced during conversion or maintenance activities.
 
-### Project Level
-- **Dependencies**: Document all external dependencies of the project
+### Build Assessment Guidelines
+* Follow the structure and sections defined in `build-interpretation-runbook.<build system>.md`
+* Assess at the logical build step/target level, explaining each component part of the logical build step/target
+* Focus on understanding what the build system is accomplishing and how it accomplishes it
+* Maintain consistent formatting that mirrors the section structure in the interpretation runbook
 
-### Build step level
+### Build Assessment Contents
+* For each assessment point, include:
+  - **Description**: explain what this specific build construct accomplishes and how it works
+  - **Source Code Snippet**: relevant source code that demonstrates this assessment point
+  - **Path to Source File**: file path relative to the project root where this construct is located
+  - **Line Number in Source File**: specific line number or range where this construct appears
+  - **Reference Tags**: all relevant interpretation pattern tags (e.g., `[IP-<CATEGORY>-<NUMBER>]`, `[PROPOSED-IP-<CATEGORY>-<NUMBER>]`)
 
-For every build step, document:
+## Interpretation Runbook Maintenance (`build-interpretation-runbook.proposal.<build system>.md`)
 
-#### Elements
-- **Purpose**: What the build step accomplishes
-- **Inputs**: All files, variables, and dependencies required
-- **Outputs**: All generated files, artifacts, and side effects
-- **Key Parameters**: Important configuration options, flags, and variables
-- **Dependencies**: Other build steps whose outputs are directly consumed as inputs by this step. Only include actual dependencies where this step cannot execute without the completion of another step. If there are none, explicitly state "None"
-- **Guideline Reference**: Reference to the specific guideline(s) from `build-assessment-guidelines.<build system>.md` that this step exemplifies or follows
-- **Source code snippit**: Include source code from the actual build script
+The interpretation runbook maintenance captures new knowledge about how to understand and interpret build system constructs. This builds a reusable knowledge base that improves the quality and consistency of future build system assessments by documenting patterns for recognizing what different build constructs accomplish. If the existing runbook sufficiently covers the build constructs encountered during analysis, note that and do not feel obligated to propose new patterns.
 
-#### Guidelines
-- **Granularity**: Break down large, complex build steps into component parts and explain each component part
-- **Formatting**: Maintain consistent and clear formatting throughout
+### Interpretation Pattern Guidelines
+* Only propose new interpretation patterns when the existing runbook does not adequately cover build constructs encountered during this project assessment
+* Propose new interpretation patterns based on build constructs encountered during this project assessment
+* Propose improvements, clarifications, and extensions to existing interpretation patterns where evidence from the current analysis reveals new ways build systems accomplish their goals
+* Base all proposals on actual project experience, not theoretical scenarios and best practices
+* Structure proposals into logically consistent sections that can be integrated into the main interpretation runbook
+* Focus on a single, specific build system concept that accomplishes one logical purpose (e.g., setting a library's public header, configuring version information, or defining shared object versioning)
+* Avoid combining multiple logically distinct build system concepts into a single pattern, even if they commonly appear together in the same build construct
+* Use generic, project-agnostic source code examples that exemplify the pattern rather than including project-specific names, paths, or configuration details
+* Ensure proposed interpretation patterns can be validated and applied consistently across different projects
 
-### Public Interface Analysis
-
-Document the public and private interface elements:
-
-#### Public Interface Elements
-- **Public Headers and Libraries**: Headers and libraries intended for external consumption, identified through build system mechanisms or common implicit patterns
-- **Interface Indicators**: Build system patterns that explicitly mark components as public
-
-#### Private Interface Elements
-- **Private Headers and Libraries**: Headers and libraries for internal use only, identified through build system mechanisms or common implicit patterns
-- **Interface Indicators**: Build system patterns that indicate internal-only components
-
-#### Analysis Guidelines
-- **Evidence-based**: Only identify public/private distinctions based on actual build system patterns, not assumptions
-- **Build System Specific**: Use build system-specific indicators rather than general naming conventions
-
-## Guideline Maintenance Requirements (`build-assessment-guidelines.<build system>.md`)
-
-#### Elements
-- **Name**: Descriptive name of the guideline
-- **Description**: What this guideline helps identify or assess
-- **When to Apply**: Specific build system patterns or features that trigger this guideline. Only include if encountered. Do not add speculatively.
-- **When to Avoid**: Specific build system patterns or features that trigger avoiding this guideline. Only include if encountered. Do not add speculatively.
-- **Source Code Patterns**: Generic code examples showing the pattern. Focus on creating general purpose code examples and not examples specific to any one build.
-- **Projects Applied**: List of projects where this guideline was useful. If you found a guideline to be useful during the current assessment, add the current project to the list.
-
-#### Guidelines
-- **Preserve ALL existing guidelines** from the current file
-- **Add new guidelines** based only on patterns discovered in the current project
-- **Update existing guidelines** if new evidence supports refinement
-- **No speculation**: Only create guidelines based on actual build system patterns observed. Avoid adding theoretical best practices not encountered
+### Interpretation Pattern Contents
+* For each proposed interpretation pattern:
+  - **Reference Tag**: uniquely identify the pattern (e.g., `[PROPOSED-IP-<CATEGORY>-<NUMBER>]` for new, `[IP-<CATEGORY>-<NUMBER>-REVISION]` for improvements)
+  - **Pattern Description**: explain what this pattern means for the existing build system's behavior and intent
+  - **Pattern Identification**: describe the specific code constructs, syntax, or structural elements that indicate this pattern is present in the build source code
+  - **Source Example**: add project agnostic source code snippet that demonstrates the pattern
+  - **Exceptional Cases**: list situations where the pattern identification criteria are met but additional build script context indicates a different interpretation should be applied. Format as a list where each exception includes:
+    - **Exception Description**: explain what this exceptional case means for the build system's behavior and intent when the additional context is present, and why it differs from the base pattern interpretation
+    - **Exception Pattern Identification**: pattern identification criteria for recognizing when this exception applies
+    - **Exception Source Example**: source example showing the base pattern plus the exceptional information
+    - **Exception Handler Reference**: reference tag for the pattern that handles this exceptional case (or "NONE" if no pattern exists yet)

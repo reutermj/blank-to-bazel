@@ -1,0 +1,145 @@
+# Build Interpretation Runbook Proposal - CMake
+
+This document proposes interpretation patterns for understanding and analyzing CMake build systems based on analysis of the Parson JSON library project.
+
+## Basic Project Structure Patterns
+
+### [IP-CMAKE-STRUCTURE-001] - CMake Version Requirement Pattern
+**Pattern Description**: Establishes minimum CMake version compatibility requirements for the build system. This pattern indicates the baseline CMake functionality required to process the build script.
+
+**Pattern Identification**: 
+- `cmake_minimum_required(VERSION <version>)` call
+- Typically appears at the beginning of CMakeLists.txt files
+- Version specification using semantic versioning
+
+**Source Example**:
+```cmake
+cmake_minimum_required(VERSION 3.5)
+```
+
+**Exceptional Cases**: None encountered yet.
+
+### [IP-CMAKE-STRUCTURE-002] - Project Declaration Pattern
+**Pattern Description**: Establishes fundamental project metadata including name and supported languages. This pattern defines the project's identity and language configuration for the build system.
+
+**Pattern Identification**: 
+- `project(<name> <languages>)` call
+- Project name as first parameter
+- Language specification as additional parameters
+- Optional project-level configuration in project() call
+
+**Source Example**:
+```cmake
+project(myproject C)
+```
+
+**Exceptional Cases**: None encountered yet.
+
+### [IP-CMAKE-STRUCTURE-003] - Standard Module Inclusion Pattern
+**Pattern Description**: Incorporates CMake standard modules to extend build system capabilities with predefined functionality. This pattern indicates reliance on CMake's standard library for common build tasks.
+
+**Pattern Identification**:
+- `include(<module_name>)` calls for standard CMake modules
+- Common modules: GNUInstallDirs, FindPackageHandleStandardArgs, etc.
+
+**Source Example**:
+```cmake
+include (GNUInstallDirs)
+```
+
+**Exceptional Cases**: None encountered yet.
+
+### [IP-CMAKE-STRUCTURE-004] - Centralized Version Management Pattern
+**Pattern Description**: Establishes project version information in variables for reuse across multiple build components. This pattern ensures version consistency and simplifies version maintenance.
+
+**Pattern Identification**:
+- `set(<PROJECT>_VERSION <version>)` variable definition
+- Version variable referenced in target properties or other contexts
+
+**Source Example**:
+```cmake
+set(PROJECT_VERSION 1.2.3)
+```
+
+**Exceptional Cases**: None encountered yet.
+
+## Target Definition Patterns
+
+### [IP-CMAKE-TARGET-001] - Library Target with Public Interface Pattern
+**Pattern Description**: Defines a library target with public include directories configured for both build-time and install-time consumption. This pattern enables proper header discovery for downstream projects.
+
+**Pattern Identification**:
+- `add_library(<target> <sources>)` call
+- `target_include_directories()` with PUBLIC scope and generator expressions
+- Generator expression `$<INSTALL_INTERFACE:...>` usage
+
+**Source Example**:
+```cmake
+add_library(mylib source.c)
+target_include_directories(mylib PUBLIC $<INSTALL_INTERFACE:include>)
+```
+
+**Exceptional Cases**: None encountered yet.
+
+### [IP-CMAKE-TARGET-002] - Library Properties Configuration Pattern
+**Pattern Description**: Configures essential library metadata including public headers, version information, and shared library versioning. This pattern establishes library identity and compatibility information.
+
+**Pattern Identification**:
+- Multiple `set_target_properties()` calls for same target
+- Properties: PUBLIC_HEADER, VERSION, SOVERSION
+- Version variable references in property values
+
+**Source Example**:
+```cmake
+set_target_properties(mylib PROPERTIES PUBLIC_HEADER "mylib.h")
+set_target_properties(mylib PROPERTIES VERSION ${PROJECT_VERSION})
+set_target_properties(mylib PROPERTIES SOVERSION ${PROJECT_VERSION})
+```
+
+**Exceptional Cases**: None encountered yet.
+
+## Installation Patterns
+
+### [IP-CMAKE-INSTALL-001] - Comprehensive Installation Pattern
+**Pattern Description**: Defines complete installation rules covering all library components (runtime, libraries, archives, headers) with proper destination configuration and export setup.
+
+**Pattern Identification**:
+- `install(TARGETS ...)` with EXPORT specified
+- Multiple DESTINATION clauses for different component types
+- Usage of CMAKE_INSTALL_* variables for destinations
+- COMPONENT specifications for package organization
+
+**Source Example**:
+```cmake
+install(
+    TARGETS mylib
+    EXPORT mylibTargets
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT shlib
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+```
+
+**Exceptional Cases**: None encountered yet.
+
+### [IP-CMAKE-INSTALL-002] - Package Export Configuration Pattern
+**Pattern Description**: Creates CMake package configuration files that enable downstream projects to find and use the library through find_package(). This pattern implements modern CMake consumption patterns.
+
+**Pattern Identification**:
+- `install(EXPORT ...)` command
+- FILE parameter specifying config file name
+- NAMESPACE parameter for target prefixing
+- DESTINATION targeting cmake package directory
+
+**Source Example**:
+```cmake
+install(
+    EXPORT mylibTargets
+    FILE mylibConfig.cmake
+    NAMESPACE mylib::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+)
+```
+
+**Exceptional Cases**: None encountered yet.
