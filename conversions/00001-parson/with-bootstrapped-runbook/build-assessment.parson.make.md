@@ -1,138 +1,138 @@
-# Build Assessment - Parson - Makefile
+# Build Assessment - Parson Project - Makefile
 
-This document provides a comprehensive analysis of the Makefile build system for the Parson JSON library project.
+This document provides a comprehensive assessment of the Makefile build system for the Parson JSON library project.
 
 ## Compiler Configuration
 
-### C Compiler Selection
-**Description**: Defines GCC as the C compiler for the project. This establishes the primary compilation toolchain for building C code in the project.
+### [BAP-MAKE-COMPILER-001] C Compiler Selection
+- **Description**: Configures the C compiler to be used for building the test executables. The Makefile explicitly selects GCC as the C compiler for compilation.
 
-**Source Code Snippet**:
+- **Source Code Snippet**:
 ```makefile
 CC = gcc
 ```
 
-**Path to Source File**: Makefile
-**Line Number in Source File**: 1
-**Reference Tags**: [IP-MAKE-COMPILER-001]
+- **Path to Source File**: Makefile
+- **Line Number in Source File**: 1
+- **References**: [IP-MAKE-COMPILER-001]
 
-### C Compiler Flags Configuration  
-**Description**: Configures comprehensive C compilation flags including debugging, warnings, C89 standard compliance, and test-specific preprocessor definitions. The flags establish strict compilation standards and enable debugging capabilities while defining the TESTS_MAIN macro for test compilation.
+### [BAP-MAKE-COMPILER-002] C Compiler Flags Configuration
+- **Description**: Establishes comprehensive C compilation flags including debug information, warnings, language standard compliance, and test-specific preprocessor definitions. The flags prioritize debugging (-O0 -g), strict compliance (-std=c89 -pedantic-errors), and comprehensive warnings (-Wall -Wextra), while defining TESTS_MAIN to enable test compilation mode.
 
-**Source Code Snippet**:
+- **Source Code Snippet**:
 ```makefile
 CFLAGS = -O0 -g -Wall -Wextra -std=c89 -pedantic-errors -DTESTS_MAIN
 ```
 
-**Path to Source File**: Makefile
-**Line Number in Source File**: 2
-**Reference Tags**: [IP-MAKE-COMPILER-002]
+- **Path to Source File**: Makefile
+- **Line Number in Source File**: 2
+- **References**: [IP-MAKE-COMPILER-002]
 
-### C++ Compiler Selection
-**Description**: Defines G++ as the C++ compiler for cross-language compatibility testing. This enables compilation of the C library with a C++ compiler to verify header compatibility and usage scenarios in C++ projects.
+### [BAP-MAKE-COMPILER-003] C++ Compiler Selection
+- **Description**: Configures the C++ compiler to enable cross-language compatibility testing. The build system includes G++ to verify that the parson.h header can be included and used in C++ projects without compatibility issues.
 
-**Source Code Snippet**:
+- **Source Code Snippet**:
 ```makefile
 CPPC = g++
 ```
 
-**Path to Source File**: Makefile
-**Line Number in Source File**: 4
-**Reference Tags**: [IP-MAKE-COMPILER-003]
+- **Path to Source File**: Makefile
+- **Line Number in Source File**: 4
+- **References**: [IP-MAKE-COMPILER-003]
 
-### C++ Compiler Flags Configuration
-**Description**: Configures C++ compilation flags for cross-language testing with debugging and warnings enabled. The flags omit C89 standard specification since C++ has different standards, but maintain the TESTS_MAIN definition for test compilation.
+### [BAP-MAKE-COMPILER-004] C++ Compiler Flags Configuration
+- **Description**: Establishes C++ compilation flags for cross-language testing. The flags maintain debugging support (-O0 -g) and warnings (-Wall -Wextra) while including the TESTS_MAIN definition to enable the same test main function as the C compilation.
 
-**Source Code Snippet**:
+- **Source Code Snippet**:
 ```makefile
 CPPFLAGS = -O0 -g -Wall -Wextra -DTESTS_MAIN 
 ```
 
-**Path to Source File**: Makefile
-**Line Number in Source File**: 5
-**Reference Tags**: [IP-MAKE-COMPILER-004]
+- **Path to Source File**: Makefile
+- **Line Number in Source File**: 5
+- **References**: [IP-MAKE-COMPILER-004]
 
-## Target Declarations
+## Target Declaration
 
-### Default Target Collection
-**Description**: Defines the default target that builds all test executables when make is run without arguments. This target encompasses standard C testing, C++ compatibility testing, and specialized conditional compilation testing.
+### [BAP-MAKE-TARGET-001] Default Target Collection
+- **Description**: Defines the default target that builds all test variants when make is executed without arguments. This target orchestrates building standard C tests, C++ compatibility tests, and hash collision testing to provide comprehensive testing coverage.
 
-**Source Code Snippet**:
+- **Source Code Snippet**:
 ```makefile
 all: test testcpp test_hash_collisions
 ```
 
-**Path to Source File**: Makefile
-**Line Number in Source File**: 7
-**Reference Tags**: [IP-MAKE-TARGET-001]
+- **Path to Source File**: Makefile
+- **Line Number in Source File**: 7
+- **References**: [IP-MAKE-TARGET-001]
 
-### Phony Target Declaration
-**Description**: Declares all test targets as phony to ensure they represent actions rather than file generation. This prevents make from treating target names as files and ensures targets execute even if files with matching names exist.
+### [BAP-MAKE-TARGET-002] Phony Target Declaration
+- **Description**: Declares test targets as phony to ensure they represent actions rather than file generation. This prevents make from treating target names as files and ensures the test targets always execute regardless of existing files with matching names.
 
-**Source Code Snippet**:
+- **Source Code Snippet**:
 ```makefile
 .PHONY: test testcpp test_hash_collisions
 ```
 
-**Path to Source File**: Makefile
-**Line Number in Source File**: 9
-**Reference Tags**: [IP-MAKE-TARGET-002]
+- **Path to Source File**: Makefile
+- **Line Number in Source File**: 9
+- **References**: [IP-MAKE-TARGET-002]
 
-## Test Execution
+## Test Execution Targets
 
-### Primary C Test Execution
-**Description**: Compiles the primary test executable using the C compiler and immediately executes it. This target combines the library source (parson.c) with the test suite (tests.c) to create a test executable, then runs it to provide immediate feedback on library functionality.
+### [BAP-MAKE-TEST-001] Standard C Test Target
+- **Description**: Implements a compile-and-execute pattern for standard C testing. This target compiles the test suite and parson library together into a single executable, then immediately executes it to provide instant test feedback. The target uses the configured C compiler and flags to build from tests.c and parson.c sources.
 
-**Source Code Snippet**:
+- **Source Code Snippet**:
 ```makefile
 test: tests.c parson.c
 	$(CC) $(CFLAGS) -o $@ tests.c parson.c
 	./$@
 ```
 
-**Path to Source File**: Makefile
-**Line Number in Source File**: 10-12
-**Reference Tags**: [IP-MAKE-TEST-001]
+- **Path to Source File**: Makefile
+- **Line Number in Source File**: 10-12
+- **References**: [IP-MAKE-TEST-001]
 
-### C++ Compatibility Test Execution
-**Description**: Compiles and executes the test suite using the C++ compiler to verify header compatibility and ensure the C library can be used in C++ projects. This cross-language testing validates that the library headers are properly designed for C++ inclusion.
+### [BAP-MAKE-TEST-002] C++ Compatibility Test Target
+- **Description**: Implements cross-language compatibility testing by compiling the same C source files with a C++ compiler. This target validates that the parson.h header is C++-compatible and can be used in C++ projects. It uses the C++ compiler with C++ flags while building from the same source files as the C test.
 
-**Source Code Snippet**:
+- **Source Code Snippet**:
 ```makefile
 testcpp: tests.c parson.c
 	$(CPPC) $(CPPFLAGS) -o $@ tests.c parson.c
 	./$@
 ```
 
-**Path to Source File**: Makefile
-**Line Number in Source File**: 14-16
-**Reference Tags**: [IP-MAKE-TEST-002]
+- **Path to Source File**: Makefile
+- **Line Number in Source File**: 14-16
+- **References**: [IP-MAKE-TEST-002]
 
-### Hash Collision Test Execution
-**Description**: Compiles and executes the test suite with a special preprocessor macro (PARSON_FORCE_HASH_COLLISIONS) to test library behavior under hash collision conditions. This conditional compilation testing validates the library's robustness when hash table collisions are artificially forced.
+### [BAP-MAKE-TEST-003] Hash Collision Test Target
+- **Description**: Implements conditional compilation testing to validate library behavior under specific internal conditions. This target defines the PARSON_FORCE_HASH_COLLISIONS preprocessor macro to enable testing of hash collision handling code paths that would otherwise be difficult to trigger in normal usage.
 
-**Source Code Snippet**:
+- **Source Code Snippet**:
 ```makefile
 test_hash_collisions: tests.c parson.c
 	$(CC) $(CFLAGS) -DPARSON_FORCE_HASH_COLLISIONS -o $@ tests.c parson.c
 	./$@
 ```
 
-**Path to Source File**: Makefile
-**Line Number in Source File**: 18-20
-**Reference Tags**: [IP-MAKE-TEST-003]
+- **Path to Source File**: Makefile
+- **Line Number in Source File**: 18-20
+- **References**: [IP-MAKE-TEST-003]
 
-## Maintenance
+## Maintenance Targets
 
-### Cleanup Target
-**Description**: Provides cleanup functionality that removes test executables and object files. The clean target focuses on removing generated test binaries and compilation artifacts, though it may not cover all possible generated files like the testcpp and test_hash_collisions executables.
+### [BAP-MAKE-MAINTENANCE-001] Selective Cleanup Target
+- **Description**: Provides cleanup functionality that removes generated test executables and object files. The cleanup is selective, focusing on test executables and object files while potentially leaving other generated files. This incomplete cleanup may indicate that the build system primarily generates test executables rather than installable artifacts.
 
-**Source Code Snippet**:
+- **Source Code Snippet**:
 ```makefile
 clean:
 	rm -f test *.o
 ```
 
-**Path to Source File**: Makefile
-**Line Number in Source File**: 22-23
-**Reference Tags**: [IP-MAKE-MAINTENANCE-001]
+- **Path to Source File**: Makefile
+- **Line Number in Source File**: 22-24
+- **References**: [IP-MAKE-MAINTENANCE-001]

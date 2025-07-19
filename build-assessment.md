@@ -20,11 +20,28 @@ The build assessment documents what the current build system accomplishes and ho
 
 ### Build Assessment Contents
 * For each assessment point, include:
+  - **Reference Tag**: uniquely identify the build assessment point (e.g., `[BAP-<BUILD SYSTEM>-<CATEGORY>-<NUMBER>]`)
   - **Description**: explain what this specific build construct accomplishes and how it works
-  - **Source Code Snippet**: relevant source code that demonstrates this assessment point
+  - **Source Code Snippet**: relevant source code that demonstrates this assessment point.
   - **Path to Source File**: file path relative to the project root where this construct is located
   - **Line Number in Source File**: specific line number or range where this construct appears
-  - **Reference Tags**: all relevant interpretation pattern tags (e.g., `[IP-<CATEGORY>-<NUMBER>]`, `[PROPOSED-IP-<CATEGORY>-<NUMBER>]`)
+  - **References**: Reference to all relevant interpretation pattern tags (e.g., `[IP-<BUILD SYSTEM>-<CATEGORY>-<NUMBER>]`, `[PROPOSED-IP-<BUILD SYSTEM>-<CATEGORY>-<NUMBER>]`)
+
+#### Example
+
+````
+### [BAP-<BUILD SYSTEM>-<CATEGORY>-<NUMBER>] <TITLE>
+- **Description**: <DESCRIPTION>
+
+- **Source Code Snippet**:
+```<LANGUAGE>
+<SOURCE CODE EXAMPLE>
+```
+
+- **Path to Source File**: <RELATIVE FILE PATH>
+- **Line Number in Source File**: <LINE NUMBER>
+- **References**: [IP-<BUILD SYSTEM>-<CATEGORY>-<NUMBER>]
+````
 
 ## Interpretation Runbook Maintenance (`build-interpretation-runbook.proposal.<build system>.md`)
 
@@ -43,7 +60,7 @@ The interpretation runbook maintenance captures new knowledge about how to under
 
 ### Interpretation Pattern Contents
 * For each proposed interpretation pattern:
-  - **Reference Tag**: uniquely identify the pattern (e.g., `[PROPOSED-IP-<CATEGORY>-<NUMBER>]` for new, `[IP-<CATEGORY>-<NUMBER>-REVISION]` for improvements)
+  - **Reference Tag**: uniquely identify the pattern (e.g., `[PROPOSED-IP-<BUILD SYSTEM>-<CATEGORY>-<NUMBER>]` for new, `[IP-<BUILD SYSTEM>-<CATEGORY>-<NUMBER>-REVISION]` for improvements)
   - **Pattern Description**: explain what this pattern means for the existing build system's behavior and intent
   - **Pattern Identification**: describe the specific code constructs, syntax, or structural elements that indicate this pattern is present in the build source code
   - **Source Example**: add project agnostic source code snippet that demonstrates the pattern
@@ -52,3 +69,51 @@ The interpretation runbook maintenance captures new knowledge about how to under
     - **Exception Pattern Identification**: pattern identification criteria for recognizing when this exception applies
     - **Exception Source Example**: source example showing the base pattern plus the exceptional information
     - **Exception Handler Reference**: reference tag for the pattern that handles this exceptional case (or "NONE" if no pattern exists yet)
+
+#### Example 1
+
+````
+### [IP-<BUILD SYSTEM>-<CATEGORY>-<NUMBER>] <TITLE>
+- **Pattern Description**: <DESCRIPTION>
+
+- **Pattern Identification**: 
+  - <ITEM 1>
+  - <ITEM 1>
+  - ...
+
+- **Source Example**:
+```<LANGUAGE>
+<SOURCE CODE EXAMPLE>
+```
+
+- **Exceptional Cases**: None.
+````
+
+#### Example 2
+
+````
+### [IP-<BUILD SYSTEM>-<CATEGORY>-<NUMBER>] <TITLE>
+- **Pattern Description**: <DESCRIPTION>
+
+- **Pattern Identification**: 
+  - <ITEM 1>
+  - <ITEM 1>
+  - ...
+
+- **Source Example**:
+```<LANGUAGE>
+<SOURCE CODE EXAMPLE>
+```
+
+- **Exceptional Cases**: 
+  - **Exception Description**: <DESCRIPTION>
+  - **Exception Pattern Identification**:
+    - <ITEM 1>
+    - <ITEM 1>
+    - ...
+  - **Exception Source Example**:
+```<LANGUAGE>
+<SOURCE CODE EXAMPLE>
+```
+  - **Exception Handler Reference**: [IP-<BUILD SYSTEM>-<CATEGORY>-<NUMBER>]
+````
